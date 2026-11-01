@@ -9,13 +9,13 @@ export const watercolorIcons: Record<string, string> = {
   // Day
   "01d": "/icons/watercolor/04d_overcast.png",          // Smiling bright sun with rays (Clear sky)
   "02d": "/icons/watercolor/11d_thunderstorm.png",      // Sun behind small cloud (Mostly clear)
-  "03d": "/icons/watercolor/50d_mist.png",              // Two fluffy scattered clouds (Partly cloudy)
-  "04d_broken": "/icons/watercolor/09d_shower_rain.png",// Fluffy broken clouds
+  "03d": "/icons/watercolor/09d_shower_rain.png",       // Soft white fluffy clouds (Partly cloudy)
+  "04d_broken": "/icons/watercolor/50d_mist.png",       // Fluffy broken clouds
   "04d": "/icons/watercolor/02d_few_clouds.png",        // Dark gray overcast cloud (Overcast)
   "09d_drizzle": "/icons/watercolor/01d_clear_sky.png", // Cloud with 3 light drizzle drops
   "09d": "/icons/watercolor/13d_snow.png",              // Cloud with splashing shower rain drops
   "10d_light": "/icons/watercolor/01d_clear_sky.png",   // Light rain
-  "10d": "/icons/watercolor/50d_smoke.png",             // Steady rain cloud
+  "10d": "/icons/watercolor/13d_snow.png",              // Steady rain cloud
   "10d_heavy": "/icons/watercolor/10d_heavy_rain.png",  // Dark cloud with torrential rain
   "11d": "/icons/watercolor/10d_light_rain.png",        // Dark storm cloud with yellow lightning bolt
   "13d": "/icons/watercolor/01n_clear_night.png",       // Blue sparkling snowflake
@@ -23,10 +23,10 @@ export const watercolorIcons: Record<string, string> = {
   // Night
   "01n": "/icons/watercolor/03d_scattered.png",         // Crescent moon with stars (Clear night)
   "02n": "/icons/watercolor/10n_rain_night.png",        // Crescent moon behind small clouds
-  "03n": "/icons/watercolor/04n_overcast_night.png",    // Crescent moon behind fluffy scattered clouds
-  "04n_broken": "/icons/watercolor/09n_shower_night.png",
+  "03n": "/icons/watercolor/04n_overcast_night.png",    // Crescent moon behind fluffy clouds
+  "04n_broken": "/icons/watercolor/09n_shower_night.png",// Broken clouds night
   "04n": "/icons/watercolor/09n_shower_night.png",      // Overcast night
-  "09n_drizzle": "/icons/watercolor/04n_broken_night.png",
+  "09n_drizzle": "/icons/watercolor/04n_broken_night.png", // Night drizzle with moon
   "09n": "/icons/watercolor/03n_scattered_night.png",   // Night shower with crescent moon
   "10n": "/icons/watercolor/03n_scattered_night.png",   // Night rain with crescent moon
   "11n": "/icons/watercolor/02n_few_clouds_night.png",  // Night storm cloud with lightning
@@ -40,7 +40,7 @@ export const watercolorIcons: Record<string, string> = {
   "50d_dust": "/icons/watercolor/50d_haze_pure.png",    // Swirling dust storm
   "50d_smoke": "/icons/watercolor/50d_haze_ratchaburi.png",
   "50d_tornado": "/icons/watercolor/50d_tornado.png",   // Swirling tornado funnel
-  "50d_wind": "/icons/watercolor/11n_thunderstorm_night.png",
+  "50d_wind": "/icons/watercolor/11n_thunderstorm_night.png", // Swirling wind gusts
   "50n": "/icons/watercolor/50d_wind.png",              // Night mist/fog with moon
   "50n_mist": "/icons/watercolor/04d_broken.png",
   "50n_fog": "/icons/watercolor/50d_wind.png",
@@ -60,7 +60,7 @@ export const fallbackIcons: Record<string, string> = {
   "09d": "🌧️",
   "09d_drizzle": "🌦️",
   "09n": "🌧️",
-  "09n_drizzle": "🌦️",
+  "09n_drizzle": "🌧️",
   "10d": "🌧️",
   "10d_light": "🌦️",
   "10d_heavy": "⛈️",
@@ -70,10 +70,14 @@ export const fallbackIcons: Record<string, string> = {
   "13d": "❄️",
   "13n": "❄️",
   "50d": "🌫️",
-  "50d_mist": "🌫️",
   "50d_fog": "🌁",
+  "50d_mist": "🌫️",
   "50d_haze": "🌫️",
+  "50d_dust": "🌪️",
+  "50d_tornado": "🌪️",
+  "50d_wind": "💨",
   "50n": "🌫️",
+  "50n_fog": "🌁",
 };
 
 export function getWeatherIcon(iconCode: string, description?: string): string {
@@ -184,7 +188,8 @@ export function wmoToIconCode(
   }
 }
 
-interface WeatherIconProps {
+export interface WeatherIconProps {
+  code?: number | string;
   iconCode?: string;
   wmoCode?: number;
   isDay?: number;
@@ -194,6 +199,7 @@ interface WeatherIconProps {
 }
 
 export function WeatherIcon({
+  code,
   iconCode,
   wmoCode,
   isDay = 1,
@@ -203,11 +209,13 @@ export function WeatherIcon({
 }: WeatherIconProps) {
   const [imgFailed, setImgFailed] = useState(false);
 
-  let resolvedCode = iconCode;
+  // Accept code as number (WMO code) or string (iconCode)
+  const effectiveWmo = wmoCode !== undefined ? wmoCode : (typeof code === "number" ? code : undefined);
+  let resolvedCode = typeof code === "string" ? code : iconCode;
   let resolvedDesc = description;
 
-  if (wmoCode !== undefined) {
-    const mapped = wmoToIconCode(wmoCode, isDay);
+  if (effectiveWmo !== undefined) {
+    const mapped = wmoToIconCode(effectiveWmo, isDay);
     resolvedCode = mapped.iconCode;
     resolvedDesc = resolvedDesc || mapped.desc;
   }
@@ -233,3 +241,5 @@ export function WeatherIcon({
     />
   );
 }
+
+export default WeatherIcon;
