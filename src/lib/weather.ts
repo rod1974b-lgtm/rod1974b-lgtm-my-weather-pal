@@ -26,6 +26,7 @@ export type Weather = {
     temp: number;
     code: number;
     precipProb: number;
+    is_day?: number;
   }[];
   daily: {
     date: string;
@@ -112,7 +113,7 @@ export async function fetchWeather(place: Place, unit: WeatherUnit = "metric"): 
   const weatherUrl =
     `https://api.open-meteo.com/v1/forecast?latitude=${place.lat}&longitude=${place.lon}` +
     `&current=temperature_2m,apparent_temperature,weather_code,wind_speed_10m,relative_humidity_2m,uv_index,precipitation,is_day` +
-    `&hourly=temperature_2m,weather_code,precipitation_probability` +
+    `&hourly=temperature_2m,weather_code,precipitation_probability,is_day` +
     `&daily=weather_code,temperature_2m_max,temperature_2m_min,sunrise,sunset,precipitation_probability_max` +
     `&temperature_unit=${tempUnit}&wind_speed_unit=${windUnit}&precipitation_unit=${precipUnit}` +
     `&timezone=auto&forecast_days=7`;
@@ -137,15 +138,25 @@ export async function fetchWeather(place: Place, unit: WeatherUnit = "metric"): 
     aqi = Math.round(aqiRes.value.current.us_aqi);
   }
 
-  const today = j.daily.time[0];
-  const hourly = j.hourly.time
-    .map((t: string, i: number) => ({
-      time: t,
-      temp: j.hourly.temperature_2m[i],
-      code: j.hourly.weather_code[i],
-      precipProb: j.hourly.precipitation_probability?.[i] ?? 0,
-    }))
-    .filter((h: { time: string }) => h.time.startsWith(today));
+  // Anchor live hourly forecast to the current hour and roll forward 24 consecutive hours
+  const currentHourIso = j.current?.time ? j.current.time.slice(0, 13) + ":00" : "";
+  let startIdx = j.hourly?.time?.findIndex((t: string) => t >= currentHourIso) ?? 0;
+  if (startIdx === -1) startIdx = 0;
+
+  const totalHours = j.hourly?.time?.length ?? 0;
+  const count = Math.min(24, Math.max(0, totalHours - startIdx));
+  const hourly = [];
+
+  for (let idx = 0; idx < count; idx++) {
+    const dataIdx = startIdx + idx;
+    hourly.push({
+      time: j.hourly.time[dataIdx],
+      temp: idx === 0 && j.current?.temperature_2m !== undefined ? j.current.temperature_2m : j.hourly.temperature_2m[dataIdx],
+      code: idx === 0 && j.current?.weather_code !== undefined ? j.current.weather_code : j.hourly.weather_code[dataIdx],
+      precipProb: j.hourly.precipitation_probability?.[dataIdx] ?? 0,
+      is_day: idx === 0 && j.current?.is_day !== undefined ? j.current.is_day : (j.hourly.is_day?.[dataIdx] ?? 1),
+    });
+  }
 
   const formatSunTime = (iso?: string) => (iso ? iso.slice(11, 16) : "--:--");
   const sunrise = formatSunTime(j.daily.sunrise?.[0]);
