@@ -6,6 +6,7 @@ import {
   LANDMARK_TITLES,
   LANDMARK_WATERCOLORS,
 } from "@/lib/aiWatercolorGenerator";
+import { generateWatercolorFn } from "@/lib/aiWatercolor.functions";
 
 interface AiGalleryModalProps {
   isOpen?: boolean;
@@ -20,6 +21,8 @@ interface AiGalleryModalProps {
   activeBackground?: string;
   activeBg?: string | null;
   tempC?: number;
+  currentTemp?: number;
+  isDay?: number;
   onSelectBackground?: (url: string) => void;
   onSelectBg?: (url: string) => void;
 }
@@ -43,7 +46,7 @@ export function AiGalleryModal(props: AiGalleryModalProps) {
     props.onOpenChange?.(false);
   };
 
-  const activeCity = props.city || props.cityName || "Current Location";
+  const activeCity = props.city || props.cityName || "Bangkok";
   const activeBackground = props.activeBackground || props.activeBg || "";
 
   const [activeTab, setActiveTab] = useState<"curated" | "saved" | "generate">("curated");
@@ -58,7 +61,6 @@ export function AiGalleryModal(props: AiGalleryModalProps) {
     if (isOpen) {
       setErrorMessage(null);
 
-      // Check if this city has exact curated landmarks in catalog
       const cityKey = activeCity.toLowerCase().trim();
       let cityCatalogUrls: string[] = [];
       for (const [name, urls] of Object.entries(LANDMARK_WATERCOLORS)) {
@@ -68,17 +70,16 @@ export function AiGalleryModal(props: AiGalleryModalProps) {
         }
       }
 
-      // If the city has specific catalog landmarks (e.g. Ratchaburi), show those authentic scenes first
-      const rawList = cityCatalogUrls.length > 0
-        ? cityCatalogUrls
-        : getAllAvailableArtworks(
-            activeCity,
-            props.weatherCode ?? 0,
-            props.weatherDesc ?? "clear",
-            props.country
-          );
+      const rawList =
+        cityCatalogUrls.length > 0
+          ? cityCatalogUrls
+          : getAllAvailableArtworks(
+              activeCity,
+              props.weatherCode ?? 0,
+              props.weatherDesc ?? "clear",
+              props.country
+            );
 
-      // Map URLs to their authentic landmark titles
       const normalized = (rawList || [])
         .map((item: any, idx: number) => {
           const url = typeof item === "string" ? item : item?.url || "";
@@ -95,7 +96,6 @@ export function AiGalleryModal(props: AiGalleryModalProps) {
 
       setCuratedList(normalized);
 
-      // Load saved artworks from localStorage
       try {
         const raw = localStorage.getItem(STORAGE_SAVED_KEY);
         if (raw) {
@@ -116,7 +116,6 @@ export function AiGalleryModal(props: AiGalleryModalProps) {
     props.onSelectBackground?.(url);
     props.onSelectBg?.(url);
 
-    // Save directly to localStorage per-city
     try {
       const storageKey = `weather:custom-bg:${activeCity.toLowerCase().trim()}`;
       if (url) {
@@ -150,7 +149,7 @@ export function AiGalleryModal(props: AiGalleryModalProps) {
     if (!url) return;
 
     if (savedArts.some((art) => art.url === url)) {
-      return; // Already saved
+      return;
     }
 
     const newArt: SavedArtItem = {
@@ -167,7 +166,6 @@ export function AiGalleryModal(props: AiGalleryModalProps) {
     } catch {}
   };
 
-  // Upload custom user image file
   const handleUploadClick = () => {
     fileInputRef.current?.click();
   };
@@ -203,7 +201,6 @@ export function AiGalleryModal(props: AiGalleryModalProps) {
     e.target.value = "";
   };
 
-  // Generate new watercolor via AI Gateway
   const handleGenerate = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!prompt.trim() || isGenerating) return;
@@ -212,39 +209,34 @@ export function AiGalleryModal(props: AiGalleryModalProps) {
     setErrorMessage(null);
 
     try {
-      const res = await fetch("/api/generate-watercolor", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+      const res = await generateWatercolorFn({
+        data: {
           city: activeCity,
           userPrompt: prompt.trim(),
-          prompt: prompt.trim(),
           weatherDesc: props.weatherDesc,
-        }),
+        },
       });
 
-      const data = await res.json().catch(() => null);
-
-      if (!res.ok || !data?.imageUrl) {
-        throw new Error(data?.error || "AI generation failed. Please try again.");
+      if (!res?.imageUrl) {
+        throw new Error("No image was returned from the generator.");
       }
 
       const newArt: SavedArtItem = {
         id: Date.now().toString(),
-        url: data.imageUrl,
+        url: res.imageUrl,
         label: `${activeCity} — ${prompt.trim()}`,
         date: new Date().toLocaleDateString(),
       };
 
-      const updated = [newArt, ...savedArts.filter((item) => item.url !== data.imageUrl).slice(0, 19)];
+      const updated = [newArt, ...savedArts.filter((item) => item.url !== res.imageUrl).slice(0, 19)];
       setSavedArts(updated);
       try {
         localStorage.setItem(STORAGE_SAVED_KEY, JSON.stringify(updated));
-        localStorage.setItem(`weather:custom-bg:${activeCity.toLowerCase().trim()}`, data.imageUrl);
+        localStorage.setItem(`weather:custom-bg:${activeCity.toLowerCase().trim()}`, res.imageUrl);
       } catch {}
 
-      props.onSelectBackground?.(data.imageUrl);
-      props.onSelectBg?.(data.imageUrl);
+      props.onSelectBackground?.(res.imageUrl);
+      props.onSelectBg?.(res.imageUrl);
       setPrompt("");
       handleClose();
     } catch (err: any) {
@@ -312,27 +304,27 @@ export function AiGalleryModal(props: AiGalleryModalProps) {
           </button>
         </div>
 
-        {/* Content Body */}
-        <div className="flex-1 overflow-y-auto p-4 min-h-[300px]">
+        {/* Content */}
+        <div className="p-4 overflow-y-auto max-h-[60vh] space-y-4">
+          {errorMessage && (
+            <div className="p-3 rounded-xl bg-destructive/10 border border-destructive/20 text-destructive text-xs flex items-center justify-between">
+              <span>{errorMessage}</span>
+              <button onClick={() => setErrorMessage(null)} className="ml-2 font-bold cursor-pointer">
+                ✕
+              </button>
+            </div>
+          )}
+
           {/* TAB 1: CURATED LANDMARKS */}
           {activeTab === "curated" && (
             <div>
-              <div className="flex items-center justify-between mb-3">
-                <span className="text-xs text-muted-foreground">
-                  {curatedList.length} landmark views for {activeCity}
-                </span>
-                <button
-                  type="button"
-                  onClick={() => handleSelect("")}
-                  className="text-xs font-medium text-primary hover:underline cursor-pointer"
-                >
-                  {t("gallery_reset_art", "Reset to Weather Art")}
-                </button>
-              </div>
+              <p className="text-xs text-muted-foreground mb-3">
+                Select any landmark to set it as the live watercolor background for <strong>{activeCity}</strong>.
+              </p>
 
               {curatedList.length === 0 ? (
                 <div className="text-center py-12 text-muted-foreground text-xs">
-                  No curated scenes found for this location yet. Try the <strong className="text-foreground">Generate with AI</strong> tab!
+                  No curated scenes found for this city. Use the Generate tab to create one!
                 </div>
               ) : (
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
@@ -360,7 +352,7 @@ export function AiGalleryModal(props: AiGalleryModalProps) {
                           }}
                         />
                         <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/25 to-transparent" />
-                        
+
                         <span className="absolute bottom-2 left-2 right-2 text-[11px] font-medium text-white truncate drop-shadow-xs">
                           {art.title}
                         </span>
@@ -371,7 +363,6 @@ export function AiGalleryModal(props: AiGalleryModalProps) {
                           </span>
                         )}
 
-                        {/* Bookmark to saved button */}
                         <button
                           type="button"
                           onClick={(e) => handleSaveToCollection(art.url, art.title, e)}
@@ -455,7 +446,7 @@ export function AiGalleryModal(props: AiGalleryModalProps) {
                           className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
                         />
                         <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/25 to-transparent" />
-                        
+
                         <span className="absolute bottom-2 left-2 right-2 text-[11px] font-medium text-white truncate drop-shadow-xs">
                           {art.label}
                         </span>
@@ -466,7 +457,6 @@ export function AiGalleryModal(props: AiGalleryModalProps) {
                           </span>
                         )}
 
-                        {/* Delete single item */}
                         <button
                           type="button"
                           onClick={(e) => handleDeleteSingleSaved(art.id, e)}
@@ -483,11 +473,11 @@ export function AiGalleryModal(props: AiGalleryModalProps) {
             </div>
           )}
 
-          {/* TAB 3: GENERATE WITH AI GATEWAY */}
+          {/* TAB 3: GENERATE WITH AI */}
           {activeTab === "generate" && (
             <form onSubmit={handleGenerate} className="space-y-4">
               <div className="p-3 rounded-xl bg-primary/5 border border-primary/20 text-xs text-muted-foreground">
-                Enter any scene description (e.g. <em>"Khao Ngu lake reflection at sunset with watercolor mist"</em>) to generate unique custom art for <strong>{activeCity}</strong>.
+                Enter any scene description to generate a unique custom watercolor for <strong>{activeCity}</strong>.
               </div>
 
               <div>
@@ -513,16 +503,15 @@ export function AiGalleryModal(props: AiGalleryModalProps) {
                   {[
                     `Khao Ngu limestone peaks across the emerald lake`,
                     `Damnoen Saduak wooden canal boats in morning mist`,
-                    `Ratchaburi dragon jar pottery studio in golden light`,
-                    `Suan Phueng pine forest stream with soft haze`,
-                    `Ancient Khmer temple tower at sunset watercolor`,
+                    `Golden temple stupa reflection in river at sunset`,
+                    `Tropical bay with longtail boats and limestone cliffs`,
+                    `Ancient Khmer temple tower at golden hour`,
                   ].map((sug, i) => (
                     <button
                       key={i}
                       type="button"
                       onClick={() => setPrompt(sug)}
-                      disabled={isGenerating}
-                      className="px-2 py-1 rounded-md text-[10px] bg-muted hover:bg-muted/80 text-foreground transition border border-border cursor-pointer"
+                      className="text-[11px] px-2 py-1 rounded-lg bg-muted/60 hover:bg-muted text-foreground border border-border/50 transition text-left cursor-pointer"
                     >
                       {sug}
                     </button>
@@ -530,29 +519,32 @@ export function AiGalleryModal(props: AiGalleryModalProps) {
                 </div>
               </div>
 
-              {errorMessage && (
-                <div className="p-2.5 rounded-lg bg-destructive/10 border border-destructive/20 text-destructive text-xs">
-                  {errorMessage}
-                </div>
-              )}
-
-              <button
-                type="submit"
-                disabled={!prompt.trim() || isGenerating}
-                className="w-full py-2.5 px-4 rounded-xl bg-primary text-primary-foreground font-semibold text-xs transition disabled:opacity-50 hover:bg-primary/90 flex items-center justify-center gap-2 shadow-sm cursor-pointer"
-              >
-                {isGenerating ? (
-                  <>
-                    <span className="animate-spin text-sm">⏳</span>
-                    <span>Painting custom watercolor scene...</span>
-                  </>
-                ) : (
-                  <>
-                    <span>✨</span>
-                    <span>Generate AI Watercolor</span>
-                  </>
-                )}
-              </button>
+              <div className="pt-2 flex items-center justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={handleClose}
+                  className="px-3 py-1.5 rounded-xl text-xs text-muted-foreground hover:bg-muted transition cursor-pointer"
+                >
+                  {t("cancel", "Cancel")}
+                </button>
+                <button
+                  type="submit"
+                  disabled={!prompt.trim() || isGenerating}
+                  className="px-4 py-1.5 rounded-xl text-xs bg-primary text-primary-foreground font-semibold hover:opacity-90 disabled:opacity-50 transition flex items-center gap-1.5 cursor-pointer shadow"
+                >
+                  {isGenerating ? (
+                    <>
+                      <span className="animate-spin inline-block">↻</span>
+                      <span>Generating Art...</span>
+                    </>
+                  ) : (
+                    <>
+                      <span>✨</span>
+                      <span>Generate Scene</span>
+                    </>
+                  )}
+                </button>
+              </div>
             </form>
           )}
         </div>
