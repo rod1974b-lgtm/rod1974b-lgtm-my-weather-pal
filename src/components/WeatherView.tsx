@@ -308,43 +308,44 @@ export const WeatherView: React.FC<WeatherViewProps> = ({
         )}
       </section>
 
-      {/* 2. HERO WEATHER CARD */}
-      <section className="relative overflow-hidden rounded-3xl border border-border/80 p-5 shadow-lg bg-card text-card-foreground min-h-[220px]">
+      {/* 2. HERO WEATHER CARD (Clear, Vivid Artwork Canvas) */}
+      <section className="relative overflow-hidden rounded-3xl border border-border/80 p-5 shadow-lg bg-card text-card-foreground min-h-[260px] flex flex-col justify-between">
         {heroBgUrl && (
           <div
             className="absolute inset-0 bg-cover bg-center transition-all duration-700 pointer-events-none"
             style={{
               backgroundImage: `url(${heroBgUrl})`,
-              filter: "brightness(0.92) saturate(1.05)",
+              filter: "brightness(0.98) saturate(1.1)",
             }}
           />
         )}
-        <div className="absolute inset-0 bg-gradient-to-t from-background/95 via-background/60 to-background/25 pointer-events-none" />
+        {/* Subtle, translucent protective overlay so artwork remains crisp and visible */}
+        <div className="absolute inset-0 bg-gradient-to-t from-background/70 via-background/10 to-transparent pointer-events-none" />
 
         <div className="relative z-10 flex flex-col justify-between h-full space-y-4">
           <div className="flex items-start justify-between">
             <div>
               <div className="flex items-center gap-2">
-                <h2 className="text-2xl font-bold tracking-tight text-foreground drop-shadow-xs">
+                <h2 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-foreground drop-shadow-sm">
                   {w.place.name}
                 </h2>
                 {w.place.country && (
-                  <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-muted/80 backdrop-blur-xs text-muted-foreground border border-border/50">
+                  <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-background/80 backdrop-blur-md text-foreground/80 border border-border/50 shadow-xs">
                     {w.place.country}
                   </span>
                 )}
               </div>
-              <p className="text-xs text-muted-foreground mt-0.5">
+              <p className="inline-block text-[11px] font-medium text-foreground/80 mt-1 px-2 py-0.5 rounded-full bg-background/70 backdrop-blur-md border border-border/40 shadow-xs">
                 {formatTimeAgo(w.fetchedAt, t as any)}
               </p>
             </div>
 
             <div className="flex items-center gap-2">
-              <div className="inline-flex items-center rounded-xl bg-background/80 backdrop-blur-md border border-border/60 shadow-xs p-0.5">
+              <div className="inline-flex items-center rounded-xl bg-background/85 backdrop-blur-md border border-border/60 shadow-xs p-0.5">
                 <button
                   type="button"
                   onClick={() => setGalleryOpen(true)}
-                  className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium text-foreground hover:bg-muted/60 rounded-lg transition cursor-pointer"
+                  className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold text-foreground hover:bg-muted/60 rounded-lg transition cursor-pointer"
                   title={t("open_art_gallery", "Open AI Art Gallery")}
                 >
                   <span className="text-sm">🎨</span>
@@ -364,7 +365,7 @@ export const WeatherView: React.FC<WeatherViewProps> = ({
                 type="button"
                 onClick={onRefresh}
                 disabled={loading}
-                className="p-1.5 rounded-xl bg-background/80 backdrop-blur-md border border-border/60 text-muted-foreground hover:text-foreground shadow-xs transition disabled:opacity-50 cursor-pointer"
+                className="p-1.5 rounded-xl bg-background/85 backdrop-blur-md border border-border/60 text-muted-foreground hover:text-foreground shadow-xs transition disabled:opacity-50 cursor-pointer"
                 title={t("refresh_weather", "Refresh Weather")}
               >
                 <span className={`inline-block text-sm ${loading ? "animate-spin" : ""}`}>
@@ -377,28 +378,30 @@ export const WeatherView: React.FC<WeatherViewProps> = ({
           <div className="flex items-end justify-between pt-2">
             <div>
               <div className="flex items-baseline gap-1">
-                <span className="text-5xl sm:text-6xl font-extrabold tracking-tighter text-foreground drop-shadow-xs">
+                <span className="text-5xl sm:text-6xl font-extrabold tracking-tighter text-foreground drop-shadow-sm">
                   {tempVal}
                 </span>
-                <span className="text-2xl font-semibold text-muted-foreground">
+                <span className="text-2xl font-bold text-foreground/80 drop-shadow-xs">
                   {tempUnitStr}
                 </span>
               </div>
-              <p className="text-base font-semibold text-foreground/90 mt-1 drop-shadow-xs">
-                {conditionLabel}
-              </p>
-              <p className="text-xs text-muted-foreground">
-                {t("feels_like", "Feels like")} {feelsVal}{tempUnitStr}
-              </p>
+              <div className="mt-1 flex flex-wrap items-center gap-2">
+                <span className="inline-block text-base font-bold text-foreground px-2.5 py-0.5 rounded-xl bg-background/75 backdrop-blur-md border border-border/40 shadow-xs">
+                  {conditionLabel}
+                </span>
+                <span className="inline-block text-xs font-semibold text-foreground/85 px-2 py-0.5 rounded-full bg-background/75 backdrop-blur-md border border-border/40 shadow-xs">
+                  {t("feels_like", "Feels like")} {feelsVal}{tempUnitStr}
+                </span>
+              </div>
             </div>
 
             <div className="flex flex-col items-center">
               <WeatherIcon
                 code={w.current.code}
                 isDay={w.current.is_day}
-                className="w-18 h-18 sm:w-20 sm:h-20 drop-shadow-md"
+                className="w-18 h-18 sm:w-20 sm:h-20 drop-shadow-lg"
               />
-              <span className="text-[11px] font-medium text-muted-foreground mt-1 px-2 py-0.5 rounded-full bg-background/60 backdrop-blur-xs">
+              <span className="text-[11px] font-semibold text-foreground mt-1 px-2.5 py-0.5 rounded-full bg-background/80 backdrop-blur-md border border-border/40 shadow-xs">
                 {w.current.is_day ? t("daytime", "Day") : t("nighttime", "Night")}
               </span>
             </div>
