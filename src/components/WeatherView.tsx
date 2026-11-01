@@ -29,49 +29,49 @@ interface WeatherViewProps {
   onSelectBackground?: (url: string) => void;
 }
 
-const WMO_KEY_MAP: Record<number, string> = {
-  0: "cond_clear",
-  1: "cond_mostly_clear",
-  2: "cond_partly_cloudy",
-  3: "cond_overcast",
-  45: "cond_fog",
-  48: "cond_depositing_rime_fog",
-  51: "cond_light_drizzle",
-  53: "cond_moderate_drizzle",
-  55: "cond_dense_drizzle",
-  56: "cond_light_freezing_drizzle",
-  57: "cond_dense_freezing_drizzle",
-  61: "cond_slight_rain",
-  63: "cond_moderate_rain",
-  65: "cond_heavy_rain",
-  66: "cond_light_freezing_rain",
-  67: "cond_heavy_freezing_rain",
-  71: "cond_slight_snow",
-  73: "cond_moderate_snow",
-  75: "cond_heavy_snow",
-  77: "cond_snow_grains",
-  80: "cond_slight_rain_showers",
-  81: "cond_moderate_rain_showers",
-  82: "cond_violent_rain_showers",
-  85: "cond_slight_snow_showers",
-  86: "cond_heavy_snow_showers",
-  95: "cond_thunderstorm",
-  96: "cond_thunderstorm_slight_hail",
-  99: "cond_thunderstorm_heavy_hail",
+const WMO_KEY_MAP: Record<number, { key: string; fallback: string }> = {
+  0: { key: "cond_clear", fallback: "Clear sky" },
+  1: { key: "cond_partly_cloudy", fallback: "Partly cloudy" },
+  2: { key: "cond_partly_cloudy", fallback: "Partly cloudy" },
+  3: { key: "cond_overcast", fallback: "Overcast" },
+  45: { key: "cond_fog", fallback: "Fog" },
+  48: { key: "cond_fog", fallback: "Fog" },
+  51: { key: "cond_drizzle", fallback: "Drizzle" },
+  53: { key: "cond_drizzle", fallback: "Drizzle" },
+  55: { key: "cond_drizzle", fallback: "Drizzle" },
+  56: { key: "cond_drizzle", fallback: "Drizzle" },
+  57: { key: "cond_drizzle", fallback: "Drizzle" },
+  61: { key: "cond_rain", fallback: "Rain" },
+  63: { key: "cond_rain", fallback: "Rain" },
+  65: { key: "cond_heavy_rain", fallback: "Heavy rain" },
+  66: { key: "cond_heavy_rain", fallback: "Freezing rain" },
+  67: { key: "cond_heavy_rain", fallback: "Heavy freezing rain" },
+  71: { key: "cond_snow", fallback: "Snow" },
+  73: { key: "cond_snow", fallback: "Snow" },
+  75: { key: "cond_snow", fallback: "Heavy snow" },
+  77: { key: "cond_snow", fallback: "Snow grains" },
+  80: { key: "cond_showers", fallback: "Showers" },
+  81: { key: "cond_showers", fallback: "Showers" },
+  82: { key: "cond_showers", fallback: "Heavy showers" },
+  85: { key: "cond_snow_showers", fallback: "Snow showers" },
+  86: { key: "cond_snow_showers", fallback: "Heavy snow showers" },
+  95: { key: "cond_thunderstorm", fallback: "Thunderstorm" },
+  96: { key: "cond_thunderstorm", fallback: "Thunderstorm with hail" },
+  99: { key: "cond_thunderstorm", fallback: "Severe thunderstorm" },
 };
 
 function getConditionLabel(code: number, t: (k: string, fallback: string) => string): string {
-  const key = WMO_KEY_MAP[code];
-  if (key) return t(key, "Weather");
-  if (code === 0) return t("cond_clear_sky", "Clear Sky");
-  if (code === 1) return t("cond_mainly_clear", "Mainly Clear");
-  if (code === 2) return t("cond_partly_cloudy", "Partly Cloudy");
+  const item = WMO_KEY_MAP[code];
+  if (item) return t(item.key, item.fallback);
+  if (code <= 2) return t("cond_partly_cloudy", "Partly cloudy");
   if (code === 3) return t("cond_overcast", "Overcast");
-  if (code >= 51 && code <= 67) return t("cond_rain", "Rain");
-  if (code >= 71 && code <= 77) return t("cond_snow", "Snow");
-  if (code >= 80 && code <= 82) return t("cond_showers", "Showers");
-  if (code >= 95) return t("cond_thunderstorm", "Thunderstorm");
-  return t("cond_fair", "Fair");
+  if (code <= 48) return t("cond_fog", "Fog");
+  if (code <= 57) return t("cond_drizzle", "Drizzle");
+  if (code <= 67) return t("cond_rain", "Rain");
+  if (code <= 77) return t("cond_snow", "Snow");
+  if (code <= 82) return t("cond_showers", "Showers");
+  if (code <= 86) return t("cond_snow_showers", "Snow showers");
+  return t("cond_thunderstorm", "Thunderstorm");
 }
 
 function getUvLabel(uv: number, t: (k: string, fallback: string) => string): string {
