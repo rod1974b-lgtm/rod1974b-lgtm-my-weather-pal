@@ -9,7 +9,7 @@ export const watercolorIcons: Record<string, string> = {
   // Day
   "01d": "/icons/watercolor/04d_overcast.png",          // Smiling bright sun with rays (Clear sky)
   "02d": "/icons/watercolor/11d_thunderstorm.png",      // Sun behind small cloud (Mostly clear)
-  "03d": "/icons/watercolor/09d_shower_rain.png",       // Soft white fluffy clouds (Partly cloudy)
+  "03d": "/icons/watercolor/11d_thunderstorm.png",      // Sun behind cloud (Partly cloudy)
   "04d_broken": "/icons/watercolor/50d_mist.png",       // Fluffy broken clouds
   "04d": "/icons/watercolor/02d_few_clouds.png",        // Dark gray overcast cloud (Overcast)
   "09d_drizzle": "/icons/watercolor/01d_clear_sky.png", // Cloud with 3 light drizzle drops
