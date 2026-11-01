@@ -230,7 +230,7 @@ function deriveLocalWeatherAlerts(w: Weather): TickerAlertItem[] {
 }
 
 function Index() {
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
 
   // Core state
   const [place, setPlace] = useState<Place>(DEFAULT_PLACE);
@@ -250,7 +250,7 @@ function Index() {
   const [searchOpen, setSearchOpen] = useState(false);
 
   // Modals & active custom background
-  const [showLocDialog, setShowLocDialog] = useState(false);
+  const [, setShowLocDialog] = useState(false);
   const [showAiGallery, setShowAiGallery] = useState(false);
   const [customBgUrl, setCustomBgUrl] = useState<string | null>(null);
 
@@ -339,28 +339,48 @@ function Index() {
     }
   };
 
-  // Fetch live weather data whenever place or unit changes
+  // Fetch live weather data on place/unit change + auto-refresh every 10 min & on tab visibility
   useEffect(() => {
     let cancelled = false;
-    setLoading(true);
-    setError(null);
 
-    getWeather(place, unit)
-      .then((data) => {
-        if (!cancelled) {
-          setWeather(data);
-          setLoading(false);
-        }
-      })
-      .catch((err) => {
-        if (!cancelled) {
-          setError(err?.message || "Failed to load weather");
-          setLoading(false);
-        }
-      });
+    const loadWeatherData = (silent = false) => {
+      if (!silent) setLoading(true);
+      setError(null);
+
+      getWeather(place, unit)
+        .then((data) => {
+          if (!cancelled) {
+            setWeather(data);
+            setLoading(false);
+          }
+        })
+        .catch((err) => {
+          if (!cancelled) {
+            if (!silent) setError(err?.message || "Failed to load weather");
+            setLoading(false);
+          }
+        });
+    };
+
+    loadWeatherData(false);
+
+    // Auto-refresh interval (10 minutes) to keep live hourly forecast and weather updated
+    const interval = setInterval(() => {
+      loadWeatherData(true);
+    }, 10 * 60 * 1000);
+
+    // Re-check when user switches back to this tab
+    const handleVisibility = () => {
+      if (document.visibilityState === "visible") {
+        loadWeatherData(true);
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibility);
 
     return () => {
       cancelled = true;
+      clearInterval(interval);
+      document.removeEventListener("visibilitychange", handleVisibility);
     };
   }, [place, unit]);
 
@@ -533,14 +553,6 @@ function Index() {
                 setUnit(u);
                 saveUnitPref(u);
               }}
-              skyPref={skyPref}
-              onSkyChange={(s) => {
-                setSkyPref(s);
-                try {
-                  localStorage.setItem("weather:sky-pref", s);
-                  window.dispatchEvent(new CustomEvent("weather:sky-change", { detail: s }));
-                } catch {}
-              }}
             />
           </div>
         </div>
@@ -646,14 +658,12 @@ function Index() {
         {weather ? (
           <WeatherView
             weather={weather}
-            disasters={alerts}
+            activeAlerts={alerts}
             unit={unit}
-            isFav={isFavorite(place, favorites)}
-            onToggleFav={handleToggleFavorite}
+            loading={loading}
             onRefresh={handleRefresh}
-            onOpenGallery={() => setShowAiGallery(true)}
-            customBg={customBgUrl}
             onSelectBg={handleSelectCustomBg}
+            onSelectBackground={handleSelectCustomBg}
           />
         ) : null}
       </main>
@@ -671,9 +681,10 @@ function Index() {
               ? ((weather.current.temp - 32) * 5) / 9
               : weather.current.temp
           }
-          activeBackground={customBgUrl ?? undefined}
-          onSelectBackground={handleSelectCustomBg}
-          onSelectBg={handleSelectCustomBg}
+          activeBg={customBgUrl}
+          activeBackground={customBgUrl || ""}
+          onSelectBackground={(url: string) => handleSelectCustomBg(url)}
+          onSelectBg={(url: string) => handleSelectCustomBg(url)}
         />
       )}
 
