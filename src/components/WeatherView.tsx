@@ -1,57 +1,77 @@
+// src/components/WeatherView.tsx
 import React, { useState, useEffect } from "react";
 import { type Weather, type WeatherUnit, type Place } from "@/lib/weather";
 import { WeatherIcon } from "@/lib/weatherIcons";
 import { useTranslation } from "react-i18next";
-import { getCityWeatherBackground } from "@/lib/aiWatercolorGenerator";
+import {
+  getAllAvailableArtworks,
+  getCityWeatherBackground,
+} from "@/lib/aiWatercolorGenerator";
 import { AiGalleryModal } from "@/components/AiGalleryModal";
 
 export interface TickerAlertItem {
   id: string;
   text: string;
   severity: "disaster" | "warning" | "advisory" | "all-clear";
-  source?: string;
   tag?: string;
   tagKey?: string;
 }
 
 interface WeatherViewProps {
-  weather?: Weather;
-  w?: Weather;
+  weather?: Weather | null;
+  w?: Weather | null;
+  activeAlerts?: TickerAlertItem[];
+  disasters?: TickerAlertItem[];
   unit: WeatherUnit;
-  onRefresh?: () => void;
-  loading?: boolean;
+  loading: boolean;
+  onRefresh: () => void;
   onSelectBg?: (url: string) => void;
   onSelectBackground?: (url: string) => void;
-  activeAlerts?: TickerAlertItem[];
 }
 
-function formatTimeAgo(timestamp?: number, t?: (k: string, d?: string) => string): string {
-  if (!timestamp || isNaN(timestamp)) return "";
-  const diffSec = Math.floor((Date.now() - timestamp) / 1000);
-  if (diffSec < 60) return t ? t("updated_just_now", "Updated just now") : "Updated just now";
-  const diffMin = Math.floor(diffSec / 60);
-  if (diffMin === 1) return t ? t("updated_1_min_ago", "Updated 1 min ago") : "Updated 1 min ago";
-  if (diffMin < 60) return t ? t("updated_mins_ago", `Updated ${diffMin} mins ago`) : `Updated ${diffMin} mins ago`;
-  const diffHours = Math.floor(diffMin / 60);
-  return t ? t("updated_hours_ago", `Updated ${diffHours} hr ago`) : `Updated ${diffHours} hr ago`;
-}
+const WMO_KEY_MAP: Record<number, string> = {
+  0: "cond_clear",
+  1: "cond_mostly_clear",
+  2: "cond_partly_cloudy",
+  3: "cond_overcast",
+  45: "cond_fog",
+  48: "cond_depositing_rime_fog",
+  51: "cond_light_drizzle",
+  53: "cond_moderate_drizzle",
+  55: "cond_dense_drizzle",
+  56: "cond_light_freezing_drizzle",
+  57: "cond_dense_freezing_drizzle",
+  61: "cond_slight_rain",
+  63: "cond_moderate_rain",
+  65: "cond_heavy_rain",
+  66: "cond_light_freezing_rain",
+  67: "cond_heavy_freezing_rain",
+  71: "cond_slight_snow",
+  73: "cond_moderate_snow",
+  75: "cond_heavy_snow",
+  77: "cond_snow_grains",
+  80: "cond_slight_rain_showers",
+  81: "cond_moderate_rain_showers",
+  82: "cond_violent_rain_showers",
+  85: "cond_slight_snow_showers",
+  86: "cond_heavy_snow_showers",
+  95: "cond_thunderstorm",
+  96: "cond_thunderstorm_slight_hail",
+  99: "cond_thunderstorm_heavy_hail",
+};
 
 function getConditionLabel(code: number, t: (k: string, fallback: string) => string): string {
-  if (code === 0) return t("cond_clear", "Clear Sky");
+  const key = WMO_KEY_MAP[code];
+  if (key) return t(key, "Weather");
+  if (code === 0) return t("cond_clear_sky", "Clear Sky");
   if (code === 1) return t("cond_mainly_clear", "Mainly Clear");
   if (code === 2) return t("cond_partly_cloudy", "Partly Cloudy");
   if (code === 3) return t("cond_overcast", "Overcast");
-  if (code === 45) return t("cond_fog", "Foggy");
-  if (code === 48) return t("cond_rime_fog", "Icy Fog");
-  if (code === 51) return t("cond_light_drizzle", "Light Drizzle");
-  if (code === 53) return t("cond_drizzle", "Drizzle");
-  if (code === 55) return t("cond_dense_drizzle", "Heavy Drizzle");
-  if (code >= 61 && code <= 65) return t("cond_rain", "Rain");
+  if (code >= 51 && code <= 67) return t("cond_rain", "Rain");
   if (code >= 71 && code <= 77) return t("cond_snow", "Snow");
   if (code >= 80 && code <= 82) return t("cond_showers", "Showers");
-  if (code >= 85 && code <= 86) return t("cond_snow_showers", "Snow Showers");
   if (code >= 95) return t("cond_thunderstorm", "Thunderstorm");
-  return t("cond_unknown", "Variable");
+  return t("cond_fair", "Fair");
 }
 
 function getUvLabel(uv: number, t: (k: string, fallback: string) => string): string {
@@ -65,58 +85,76 @@ function getUvLabel(uv: number, t: (k: string, fallback: string) => string): str
 function getAqiLabel(aqi: number, t: (k: string, fallback: string) => string): string {
   if (aqi <= 50) return t("aqi_good", "Good");
   if (aqi <= 100) return t("aqi_moderate", "Moderate");
-  if (aqi <= 150) return t("aqi_unhealthy_sensitive", "Sensitive");
+  if (aqi <= 150) return t("aqi_sensitive", "Unhealthy for Sensitive Groups");
   if (aqi <= 200) return t("aqi_unhealthy", "Unhealthy");
-  return t("aqi_very_unhealthy", "Hazardous");
+  if (aqi <= 300) return t("aqi_very_unhealthy", "Very Unhealthy");
+  return t("aqi_hazardous", "Hazardous");
+}
+
+function formatTimeAgo(timestamp: number, t: (k: string, fallback: string) => string): string {
+  if (!timestamp) return t("updated_just_now", "Updated just now");
+  const diffSec = Math.floor((Date.now() - timestamp) / 1000);
+  if (diffSec < 60) return t("updated_just_now", "Updated just now");
+  const diffMin = Math.floor(diffSec / 60);
+  if (diffMin < 60) return `${diffMin}m ago`;
+  const diffHours = Math.floor(diffMin / 60);
+  return `${diffHours}h ago`;
 }
 
 const TAG_TRANSLATION_MAP: Record<string, string> = {
   "TMD Alert": "alert_tag_tmd",
-  "Flood Watch": "alert_tag_flood",
+  "TMD Warning": "alert_tag_tmd",
   "Earthquake": "alert_tag_earthquake",
-  "Weather Warning": "alert_tag_warning",
-  "Severe Thunderstorm": "alert_tag_thunderstorm",
-  "Heavy Rain": "alert_tag_rain",
-  "High Wind": "alert_tag_wind",
-  "Poor Air Quality": "alert_tag_aqi",
-  "Special Advisory": "alert_tag_advisory",
+  "Earthquake Alert": "alert_tag_earthquake",
+  "Flood Watch": "alert_tag_flood",
+  "NWS Alert": "alert_tag_nws",
+  "Air Quality": "alert_tag_aqi",
+  "Marine Warning": "alert_tag_marine",
 };
 
 export const WeatherView: React.FC<WeatherViewProps> = ({
   weather,
   w: weatherProp,
+  activeAlerts = [],
+  disasters = [],
   unit,
+  loading,
   onRefresh,
-  loading = false,
   onSelectBg,
   onSelectBackground,
-  activeAlerts = [],
 }) => {
+  const { t } = useTranslation();
   const w = weather || weatherProp;
-  const { t, i18n } = useTranslation();
 
-  const [wearTab, setWearTab] = useState<"casual" | "business" | "sport">("casual");
-  const [artIndex, setArtIndex] = useState(0);
   const [galleryOpen, setGalleryOpen] = useState(false);
   const [heroBgUrl, setHeroBgUrl] = useState<string>("");
-  const [isAiLoading, setIsAiLoading] = useState(false);
-  const [isAiGenerated, setIsAiGenerated] = useState(false);
+  const [isAiGenerated, setIsAiGenerated] = useState<boolean>(false);
+  const [artIndex, setArtIndex] = useState(0);
 
-  const cityName = w?.place?.name || "Bangkok";
-  const cityStorageKey = `weather:custom-bg:${cityName.toLowerCase().trim()}`;
+  const cityStorageKey = w?.place?.name
+    ? `weather:custom-bg:${w.place.name.toLowerCase().trim()}`
+    : "";
 
   const handleSelectBackground = (url: string) => {
     setHeroBgUrl(url);
-    setIsAiGenerated(true);
-    try {
-      localStorage.setItem(cityStorageKey, url);
-    } catch {}
+    setIsAiGenerated(Boolean(url));
+    if (cityStorageKey) {
+      try {
+        if (url) {
+          localStorage.setItem(cityStorageKey, url);
+        } else {
+          localStorage.removeItem(cityStorageKey);
+        }
+      } catch {}
+    }
     if (onSelectBg) onSelectBg(url);
     if (onSelectBackground) onSelectBackground(url);
   };
 
   useEffect(() => {
     if (!w?.place) return;
+
+    // 1. Check if user selected custom art for this city
     try {
       const savedCityBg = localStorage.getItem(cityStorageKey);
       if (savedCityBg) {
@@ -126,19 +164,40 @@ export const WeatherView: React.FC<WeatherViewProps> = ({
       }
     } catch {}
 
-    setIsAiLoading(true);
-    getCityWeatherBackground(w.place.name, w.current.code, w.current.temp, w.current.is_day)
-      .then((art) => {
-        setHeroBgUrl(art.url);
-        setIsAiGenerated(art.isGenerated);
-      })
-      .catch(() => {
-        setHeroBgUrl("");
-        setIsAiGenerated(false);
-      })
-      .finally(() => {
-        setIsAiLoading(false);
-      });
+    // 2. Load authentic curated landmark or weather artwork
+    const conditionStr = getConditionLabel(w.current.code, t as any);
+    const arts = getAllAvailableArtworks(
+      w.place.name,
+      w.current.code,
+      conditionStr,
+      w.place.country,
+      w.place.lat,
+      w.place.lon
+    );
+
+    if (arts.length > 0) {
+      setHeroBgUrl(arts[0]);
+      setIsAiGenerated(true);
+    } else {
+      getCityWeatherBackground(
+        w.place.name,
+        conditionStr,
+        w.current.code,
+        w.current.temp,
+        (loadedUrl) => {
+          setHeroBgUrl(loadedUrl);
+          setIsAiGenerated(true);
+        },
+        w.place.country,
+        w.place.lat,
+        w.place.lon
+      ).then((res) => {
+        if (res?.initialBg && !res.initialBg.startsWith("linear-gradient")) {
+          setHeroBgUrl(res.initialBg);
+          setIsAiGenerated(res.isAi);
+        }
+      }).catch(() => {});
+    }
   }, [w?.place?.name, w?.current?.code, cityStorageKey]);
 
   if (!w) {
@@ -158,60 +217,79 @@ export const WeatherView: React.FC<WeatherViewProps> = ({
   const uvVal = w.current.uvIndex;
   const uvCategoryStr = getUvLabel(uvVal, t as any);
 
-  const aqiVal = w.current.aqi ?? 28;
+  const aqiVal = w.current.aqi;
   const aqiCategoryStr = getAqiLabel(aqiVal, t as any);
 
-  const getClothingByTab = () => {
-    const tempC = unit === "imperial" ? ((w.current.temp - 32) * 5) / 9 : w.current.temp;
-    const isRaining = w.current.code >= 51 && w.current.code <= 82;
+  const alertsToDisplay = activeAlerts.length > 0 ? activeAlerts : disasters;
 
-    if (wearTab === "business") {
-      if (tempC < 14) return t("wear_business_cold", "Tailored wool suit, overcoat, and leather shoes. A warm inner layer is advised.");
-      if (tempC < 24) return t("wear_business_mild", "Crisp button-down shirt, blazer, and comfortable dress trousers.");
-      return t("wear_business_warm", "Lightweight breathable linen/cotton shirt and light slacks.");
+  const getClothingAdviceText = () => {
+    const code = w.current.code;
+    const tempC = unit === "imperial" ? ((w.current.temp - 32) * 5) / 9 : w.current.temp;
+
+    if (code >= 95) {
+      return t("wear_thunderstorm", "Severe thunderstorm nearby. Stay indoors away from windows.");
     }
-    if (wearTab === "sport") {
-      if (tempC < 14) return t("wear_sport_cold", "Thermal running tights, windbreaker jacket, and breathable moisture-wicking layers.");
-      if (tempC < 24) return t("wear_sport_mild", "Lightweight joggers or running shorts with an athletic tee.");
-      return t("wear_sport_warm", "Breathable performance shorts and tank top. Stay hydrated!");
+    if ((code >= 51 && code <= 67) || (code >= 80 && code <= 82)) {
+      return t("wear_rain", "Rain gear recommended. Carry a sturdy umbrella or waterproof jacket.");
     }
-    if (tempC < 12) return t("wear_casual_cold", "Warm jacket or knit sweater with long pants. Keep cozy.");
-    if (tempC < 22) return t("wear_casual_mild", "Comfortable hoodie or long-sleeve tee with casual jeans.");
+    if (code >= 71 && code <= 77) {
+      return t("wear_snow", "Freezing temperatures and snow. Wear an insulated coat, thermal layers, and winter boots.");
+    }
+    if (tempC <= 5) {
+      return t("wear_freezing", "Heavy winter coat, thermal innerwear, gloves, and a warm hat.");
+    }
+    if (tempC <= 14) {
+      return t("wear_cold", "Warm jacket or fleece sweater, long trousers, and closed shoes.");
+    }
+    if (tempC <= 21) {
+      return t("wear_mild", "Light jacket, cardigan, or hoodie. Comfortable jeans or chinos.");
+    }
+    if (tempC >= 32) {
+      return t("wear_hot", "Ultra-light breathable fabrics, sunglasses, sun hat, and stay hydrated.");
+    }
     return t("wear_casual_warm", "Comfortable t-shirt, shorts, and light footwear. Perfect for easy walking.");
   };
 
   const handleNextArtwork = (e: React.MouseEvent) => {
     e.stopPropagation();
-    const nextIdx = artIndex + 1;
+    const conditionStr = getConditionLabel(w.current.code, t as any);
+    const arts = getAllAvailableArtworks(
+      w.place.name,
+      w.current.code,
+      conditionStr,
+      w.place.country,
+      w.place.lat,
+      w.place.lon
+    );
+    if (arts.length === 0) return;
+
+    const nextIdx = (artIndex + 1) % arts.length;
     setArtIndex(nextIdx);
-    setIsAiLoading(true);
-    getCityWeatherBackground(w.place.name, w.current.code, w.current.temp, w.current.is_day, nextIdx)
-      .then((art) => {
-        handleSelectBackground(art.url);
-      })
-      .catch(() => {})
-      .finally(() => setIsAiLoading(false));
+    const nextUrl = arts[nextIdx];
+    if (nextUrl) {
+      handleSelectBackground(nextUrl);
+    }
   };
 
   return (
     <div className="space-y-4">
       {/* 1. DISASTER & ADVISORY ALERT TICKER */}
       <section className="rounded-xl border border-border/70 bg-card overflow-hidden shadow-xs text-card-foreground">
-        {activeAlerts.length > 0 ? (
+        {alertsToDisplay.length > 0 ? (
           <div className="flex items-center px-3 py-2 bg-amber-500/10 text-amber-900 dark:text-amber-200 border-b border-amber-500/20 text-xs">
             <span className="font-bold flex items-center gap-1.5 shrink-0 mr-2">
               <span className="h-2 w-2 rounded-full bg-amber-500 animate-ping inline-block" />
-              <span>{t("active_advisories", "Active Advisories")} ({activeAlerts.length})</span>
+              <span>{t("active_advisories", "Active Advisories")} ({alertsToDisplay.length})</span>
             </span>
 
             <div className="overflow-hidden relative w-full flex items-center">
               <div className="flex items-center gap-6 whitespace-nowrap animate-ticker hover:[animation-play-state:paused] py-0.5">
-                {activeAlerts.map((alt) => {
+                {alertsToDisplay.map((alt) => {
                   const tagKey = alt.tagKey || (alt.tag ? TAG_TRANSLATION_MAP[alt.tag] : undefined);
                   const displayTag = tagKey ? t(tagKey, alt.tag || "Advisory") : alt.tag || "Advisory";
 
                   return (
-                    <div key={alt.id} className="inline-flex items-center gap-1.5 text-xs">
+                    <div key={alt.id} className="inline-flex items-center gap-2">
                       <span className="px-1.5 py-0.5 rounded-md font-semibold text-[10px] uppercase bg-amber-500/20 text-amber-800 dark:text-amber-300">
                         {displayTag}
                       </span>
@@ -261,150 +339,122 @@ export const WeatherView: React.FC<WeatherViewProps> = ({
               </p>
             </div>
 
-            {/* ART & REFRESH CONTROLS */}
-            <div className="flex items-center gap-1.5">
-              <div className="inline-flex items-center rounded-full bg-background/85 backdrop-blur-md border border-border/70 p-0.5 shadow-xs text-xs font-medium">
+            <div className="flex items-center gap-2">
+              <div className="inline-flex items-center rounded-xl bg-background/80 backdrop-blur-md border border-border/60 shadow-xs p-0.5">
                 <button
                   type="button"
                   onClick={() => setGalleryOpen(true)}
-                  className="px-2.5 py-1 rounded-full hover:bg-muted/70 transition-colors flex items-center gap-1 text-foreground"
+                  className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium text-foreground hover:bg-muted/60 rounded-lg transition cursor-pointer"
                   title={t("open_art_gallery", "Open AI Art Gallery")}
                 >
-                  <span>🎨</span>
+                  <span className="text-sm">🎨</span>
                   <span>{t("art", "Art")}</span>
                 </button>
                 <button
                   type="button"
                   onClick={handleNextArtwork}
-                  disabled={isAiLoading}
-                  className="px-1.5 py-1 rounded-full hover:bg-muted/70 transition-colors border-l border-border/50 text-foreground"
+                  className="px-2 py-1 text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted/60 rounded-lg transition border-l border-border/50 cursor-pointer"
                   title={t("next_artwork", "Next Artwork")}
                 >
-                  <span className={isAiLoading ? "animate-spin inline-block" : ""}>↻</span>
+                  <span>↻</span>
                 </button>
               </div>
 
-              {onRefresh && (
-                <button
-                  type="button"
-                  onClick={onRefresh}
-                  disabled={loading}
-                  className="h-8 w-8 rounded-full bg-background/85 backdrop-blur-md border border-border/70 flex items-center justify-center text-foreground hover:bg-muted/70 transition-colors shadow-xs"
-                  title={t("refresh_forecast", "Refresh Forecast")}
-                >
-                  <span className={loading ? "animate-spin" : ""}>🔄</span>
-                </button>
-              )}
+              <button
+                type="button"
+                onClick={onRefresh}
+                disabled={loading}
+                className="p-1.5 rounded-xl bg-background/80 backdrop-blur-md border border-border/60 text-muted-foreground hover:text-foreground shadow-xs transition disabled:opacity-50 cursor-pointer"
+                title={t("refresh_weather", "Refresh Weather")}
+              >
+                <span className={`inline-block text-sm ${loading ? "animate-spin" : ""}`}>
+                  🔄
+                </span>
+              </button>
             </div>
           </div>
 
           <div className="flex items-end justify-between pt-2">
             <div>
               <div className="flex items-baseline gap-1">
-                <span className="text-5xl font-black tracking-tight text-foreground drop-shadow-xs">
+                <span className="text-5xl sm:text-6xl font-extrabold tracking-tighter text-foreground drop-shadow-xs">
                   {tempVal}
                 </span>
-                <span className="text-2xl font-bold text-muted-foreground">{tempUnitStr}</span>
+                <span className="text-2xl font-semibold text-muted-foreground">
+                  {tempUnitStr}
+                </span>
               </div>
-              <p className="text-sm font-semibold text-foreground mt-0.5 drop-shadow-xs">
+              <p className="text-base font-semibold text-foreground/90 mt-1 drop-shadow-xs">
                 {conditionLabel}
               </p>
-              <p className="text-xs text-muted-foreground mt-0.5">
+              <p className="text-xs text-muted-foreground">
                 {t("feels_like", "Feels like")} {feelsVal}{tempUnitStr}
               </p>
             </div>
 
-            <div className="flex flex-col items-end">
+            <div className="flex flex-col items-center">
               <WeatherIcon
-                wmoCode={w.current.code}
-                isDay={w.current.is_day ?? 1}
-                className="h-16 w-16 drop-shadow-md"
+                code={w.current.code}
+                isDay={w.current.is_day}
+                className="w-18 h-18 sm:w-20 sm:h-20 drop-shadow-md"
               />
-              <span className="text-[11px] font-medium text-muted-foreground mt-1 bg-background/70 px-2 py-0.5 rounded-full border border-border/40 backdrop-blur-xs">
-                {w.current.is_day === 0 ? t("night", "Night") : t("day", "Day")}
+              <span className="text-[11px] font-medium text-muted-foreground mt-1 px-2 py-0.5 rounded-full bg-background/60 backdrop-blur-xs">
+                {w.current.is_day ? t("daytime", "Day") : t("nighttime", "Night")}
               </span>
             </div>
           </div>
         </div>
       </section>
 
-      {/* 3. WHAT TO WEAR ADVICE */}
-      <section className="rounded-2xl border border-border/80 bg-card p-4 shadow-xs text-card-foreground">
-        <div className="flex items-center justify-between mb-2">
-          <h3 className="font-semibold text-xs flex items-center gap-1.5 uppercase tracking-wider text-muted-foreground">
-            <span>👕</span>
-            <span>{t("what_to_wear", "What to Wear")}</span>
-          </h3>
-          <div className="flex items-center gap-1 p-0.5 bg-muted/60 rounded-lg text-xs">
-            <button
-              type="button"
-              onClick={() => setWearTab("casual")}
-              className={`px-2 py-0.5 rounded-md text-[11px] font-medium transition-all ${
-                wearTab === "casual" ? "bg-background text-foreground shadow-xs font-semibold" : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              {t("wear_casual", "Casual")}
-            </button>
-            <button
-              type="button"
-              onClick={() => setWearTab("business")}
-              className={`px-2 py-0.5 rounded-md text-[11px] font-medium transition-all ${
-                wearTab === "business" ? "bg-background text-foreground shadow-xs font-semibold" : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              {t("wear_business", "Business")}
-            </button>
-            <button
-              type="button"
-              onClick={() => setWearTab("sport")}
-              className={`px-2 py-0.5 rounded-md text-[11px] font-medium transition-all ${
-                wearTab === "sport" ? "bg-background text-foreground shadow-xs font-semibold" : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              {t("wear_sport", "Sport")}
-            </button>
+      {/* 3. WHAT TO WEAR RECOMMENDATION */}
+      <section className="p-4 rounded-2xl bg-card border border-border/70 shadow-xs text-card-foreground">
+        <div className="flex items-start gap-3">
+          <span className="text-2xl mt-0.5">👕</span>
+          <div>
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              {t("clothing_advice_title", "What to Wear")}
+            </h3>
+            <p className="text-sm font-medium mt-1 leading-snug">
+              {getClothingAdviceText()}
+            </p>
           </div>
         </div>
-        <p className="text-xs text-muted-foreground leading-relaxed">
-          {getClothingByTab()}
-        </p>
       </section>
 
-      {/* 4. LIVE 24-HOUR HOURLY FORECAST */}
-      <section className="rounded-2xl border border-border/80 bg-card p-4 shadow-xs text-card-foreground">
-        <h3 className="font-semibold text-xs mb-3 flex items-center gap-1.5 uppercase tracking-wider text-muted-foreground">
-          <span>🕒</span>
-          <span>{t("hourly_forecast", "Hourly Forecast")}</span>
+      {/* 4. HOURLY FORECAST (24 Hours Rolling from Now) */}
+      <section className="p-4 rounded-2xl bg-card border border-border/70 shadow-xs text-card-foreground">
+        <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">
+          {t("hourly_forecast", "Hourly Forecast")}
         </h3>
-
-        <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-none">
-          {w.hourly?.map((item, idx) => {
-            const date = new Date(item.time);
-            const hourStr =
-              idx === 0
-                ? t("now", "Now")
-                : date.toLocaleTimeString(i18n.language || "en", { hour: "numeric" });
-            const itemDesc = getConditionLabel(item.code, t as any);
+        <div className="flex gap-2.5 overflow-x-auto pb-2 scrollbar-none snap-x">
+          {w.hourly.map((h, i) => {
+            const timeLabel =
+              i === 0
+                ? t("time_now", "Now")
+                : new Date(h.time).toLocaleTimeString([], {
+                    hour: "numeric",
+                    minute: "2-digit",
+                  });
 
             return (
               <div
-                key={idx}
-                className="flex flex-col items-center justify-between min-w-[72px] p-2.5 rounded-xl bg-muted/30 border border-border/40 text-center shrink-0"
+                key={h.time}
+                className="flex flex-col items-center justify-between min-w-[72px] p-2.5 rounded-xl bg-muted/40 border border-border/40 shrink-0 snap-start text-center"
               >
-                <span className="text-[11px] font-medium text-muted-foreground">{hourStr}</span>
+                <span className="text-xs font-medium text-muted-foreground">
+                  {timeLabel}
+                </span>
                 <WeatherIcon
-                  wmoCode={item.code}
-                  isDay={item.is_day ?? 1}
-                  className="h-8 w-8 my-1 drop-shadow-xs"
+                  code={h.code}
+                  isDay={h.is_day ?? 1}
+                  className="w-8 h-8 my-2"
                 />
-                <span className="text-xs font-bold text-foreground">{Math.round(item.temp)}°</span>
-                {item.precipProb >= 15 ? (
-                  <span className="text-[10px] font-semibold text-sky-500 mt-0.5">
-                    💧{item.precipProb}%
-                  </span>
-                ) : (
-                  <span className="text-[10px] text-muted-foreground mt-0.5 truncate max-w-[65px]">
-                    {itemDesc}
+                <span className="text-sm font-bold">
+                  {Math.round(h.temp)}°
+                </span>
+                {h.precipProb !== undefined && h.precipProb >= 15 && (
+                  <span className="text-[10px] font-semibold text-blue-500 mt-1">
+                    💧{h.precipProb}%
                   </span>
                 )}
               </div>
@@ -413,36 +463,36 @@ export const WeatherView: React.FC<WeatherViewProps> = ({
         </div>
       </section>
 
-      {/* 5. 7-DAY FORECAST */}
-      <section className="rounded-2xl border border-border/80 bg-card p-4 shadow-xs text-card-foreground">
-        <h3 className="font-semibold text-xs mb-3 flex items-center gap-1.5 uppercase tracking-wider text-muted-foreground">
-          <span>📅</span>
-          <span>{t("daily_forecast", "7-Day Forecast")}</span>
+      {/* 5. 7-DAY EXTENDED FORECAST */}
+      <section className="p-4 rounded-2xl bg-card border border-border/70 shadow-xs text-card-foreground">
+        <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">
+          {t("daily_forecast", "7-Day Forecast")}
         </h3>
-
         <div className="space-y-2">
-          {w.daily?.map((d, idx) => {
-            const date = new Date(d.date);
+          {w.daily.map((d, i) => {
+            const dateObj = new Date(d.date + "T12:00:00");
             const dayName =
-              idx === 0
-                ? t("today", "Today")
-                : date.toLocaleDateString(i18n.language || "en", { weekday: "short" });
-            const dayDesc = getConditionLabel(d.code, t as any);
+              i === 0
+                ? t("time_today", "Today")
+                : dateObj.toLocaleDateString(undefined, { weekday: "short" });
 
             return (
               <div
-                key={idx}
-                className="flex items-center justify-between p-2 rounded-xl bg-muted/20 border border-border/30 text-xs"
+                key={d.date}
+                className="flex items-center justify-between p-2 rounded-xl hover:bg-muted/30 transition text-sm"
               >
-                <div className="w-20 font-medium text-foreground">{dayName}</div>
-                <div className="flex items-center gap-2 flex-1 justify-center">
-                  <WeatherIcon wmoCode={d.code} isDay={1} className="h-6 w-6" />
-                  <span className="text-muted-foreground text-[11px] truncate max-w-[120px]">
-                    {dayDesc}
+                <div className="w-20 font-medium">
+                  {dayName}
+                </div>
+                <div className="flex items-center gap-2">
+                  <WeatherIcon code={d.code} isDay={1} className="w-6 h-6" />
+                  <span className="text-xs text-muted-foreground hidden sm:inline w-28 truncate">
+                    {getConditionLabel(d.code, t as any)}
                   </span>
                 </div>
-                <div className="w-24 text-right flex items-center justify-end gap-2 font-mono">
-                  <span className="font-bold text-foreground">{Math.round(d.max)}°</span>
+                <div className="flex items-center gap-2 font-semibold">
+                  <span className="text-foreground">{Math.round(d.max)}°</span>
+                  <span className="text-muted-foreground/60 text-xs">/</span>
                   <span className="text-muted-foreground">{Math.round(d.min)}°</span>
                 </div>
               </div>
@@ -451,66 +501,64 @@ export const WeatherView: React.FC<WeatherViewProps> = ({
         </div>
       </section>
 
-      {/* 6. KEY WEATHER METRICS */}
-      <section className="grid grid-cols-2 gap-3">
-        <div className="rounded-2xl border border-border/80 bg-card p-3.5 shadow-xs text-card-foreground">
-          <div className="flex items-center justify-between text-muted-foreground mb-1">
-            <span className="text-xs uppercase font-medium">{t("humidity", "Humidity")}</span>
-            <span className="text-sm">💧</span>
-          </div>
-          <div className="text-xl font-bold text-foreground">{Math.round(w.current.humidity)}%</div>
-          <p className="text-[11px] text-muted-foreground mt-0.5">
-            {w.current.humidity > 70 ? t("humid", "Humid") : t("comfortable", "Comfortable")}
-          </p>
-        </div>
-
-        <div className="rounded-2xl border border-border/80 bg-card p-3.5 shadow-xs text-card-foreground">
-          <div className="flex items-center justify-between text-muted-foreground mb-1">
-            <span className="text-xs uppercase font-medium">{t("wind", "Wind")}</span>
-            <span className="text-sm">💨</span>
-          </div>
-          <div className="text-xl font-bold text-foreground">
+      {/* 6. KEY METRICS GRID */}
+      <section className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+        <div className="p-3.5 rounded-2xl bg-card border border-border/70 shadow-xs">
+          <span className="text-xs font-semibold text-muted-foreground">
+            {t("metric_wind", "Wind")}
+          </span>
+          <p className="text-lg font-bold mt-1">
             {Math.round(w.current.wind)} <span className="text-xs font-normal text-muted-foreground">{speedUnitStr}</span>
-          </div>
-          <p className="text-[11px] text-muted-foreground mt-0.5">
-            {w.current.wind > 20 ? t("breezy", "Breezy") : t("calm", "Calm")}
           </p>
         </div>
 
-        <div className="rounded-2xl border border-border/80 bg-card p-3.5 shadow-xs text-card-foreground">
-          <div className="flex items-center justify-between text-muted-foreground mb-1">
-            <span className="text-xs uppercase font-medium">{t("uv_index", "UV Index")}</span>
-            <span className="text-sm">☀️</span>
-          </div>
-          <div className="text-xl font-bold text-foreground">{uvVal}</div>
-          <p className="text-[11px] text-muted-foreground mt-0.5 font-medium">{uvCategoryStr}</p>
+        <div className="p-3.5 rounded-2xl bg-card border border-border/70 shadow-xs">
+          <span className="text-xs font-semibold text-muted-foreground">
+            {t("metric_humidity", "Humidity")}
+          </span>
+          <p className="text-lg font-bold mt-1">
+            {w.current.humidity}%
+          </p>
         </div>
 
-        <div className="rounded-2xl border border-border/80 bg-card p-3.5 shadow-xs text-card-foreground">
-          <div className="flex items-center justify-between text-muted-foreground mb-1">
-            <span className="text-xs uppercase font-medium">{t("aqi", "Air Quality")}</span>
-            <span className="text-sm">🍃</span>
-          </div>
-          <div className="text-xl font-bold text-foreground">{aqiVal}</div>
-          <p className="text-[11px] text-muted-foreground mt-0.5 font-medium">{aqiCategoryStr}</p>
+        <div className="p-3.5 rounded-2xl bg-card border border-border/70 shadow-xs">
+          <span className="text-xs font-semibold text-muted-foreground">
+            {t("metric_uv", "UV Index")}
+          </span>
+          <p className="text-lg font-bold mt-1">
+            {uvVal} <span className="text-xs font-normal text-muted-foreground">({uvCategoryStr})</span>
+          </p>
+        </div>
+
+        <div className="p-3.5 rounded-2xl bg-card border border-border/70 shadow-xs">
+          <span className="text-xs font-semibold text-muted-foreground">
+            {t("metric_aqi", "Air Quality")}
+          </span>
+          <p className="text-lg font-bold mt-1">
+            {aqiVal} <span className="text-xs font-normal text-muted-foreground">({aqiCategoryStr})</span>
+          </p>
         </div>
       </section>
 
       {/* 7. SUNRISE & SUNSET */}
-      <section className="rounded-2xl border border-border/80 bg-card p-3.5 shadow-xs text-card-foreground flex items-center justify-around text-xs">
-        <div className="flex items-center gap-2">
-          <span className="text-xl">🌅</span>
+      <section className="grid grid-cols-2 gap-2.5">
+        <div className="p-3.5 rounded-2xl bg-card border border-border/70 shadow-xs flex items-center gap-3">
+          <span className="text-2xl">🌅</span>
           <div>
-            <span className="text-muted-foreground block text-[10px] uppercase font-medium">{t("sunrise", "Sunrise")}</span>
-            <span className="font-bold text-foreground">{w.sun?.sunrise || "--:--"}</span>
+            <span className="text-xs font-semibold text-muted-foreground">
+              {t("metric_sunrise", "Sunrise")}
+            </span>
+            <p className="text-sm font-bold mt-0.5">{w.sun.sunrise}</p>
           </div>
         </div>
-        <div className="h-6 w-px bg-border/60" />
-        <div className="flex items-center gap-2">
-          <span className="text-xl">🌇</span>
+
+        <div className="p-3.5 rounded-2xl bg-card border border-border/70 shadow-xs flex items-center gap-3">
+          <span className="text-2xl">🌇</span>
           <div>
-            <span className="text-muted-foreground block text-[10px] uppercase font-medium">{t("sunset", "Sunset")}</span>
-            <span className="font-bold text-foreground">{w.sun?.sunset || "--:--"}</span>
+            <span className="text-xs font-semibold text-muted-foreground">
+              {t("metric_sunset", "Sunset")}
+            </span>
+            <p className="text-sm font-bold mt-0.5">{w.sun.sunset}</p>
           </div>
         </div>
       </section>
@@ -518,6 +566,7 @@ export const WeatherView: React.FC<WeatherViewProps> = ({
       {/* AI GALLERY MODAL */}
       <AiGalleryModal
         open={galleryOpen}
+        isOpen={galleryOpen}
         onClose={() => setGalleryOpen(false)}
         cityName={w.place.name}
         weatherCode={w.current.code}
