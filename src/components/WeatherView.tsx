@@ -158,10 +158,62 @@ export const WeatherView: React.FC<WeatherViewProps> = ({
   const [galleryOpen, setGalleryOpen] = useState(false);
   const [heroBgUrl, setHeroBgUrl] = useState<string>("");
   const [artIndex, setArtIndex] = useState(0);
+  const [isDarkArtwork, setIsDarkArtwork] = useState<boolean>(false);
 
   const cityStorageKey = w?.place?.name
     ? `weather:custom-bg:${w.place.name.toLowerCase().trim()}`
     : "";
+
+  // Auto-detect whether the hero background picture is dark or light
+  useEffect(() => {
+    if (!heroBgUrl) {
+      setIsDarkArtwork(!w?.current?.is_day);
+      return;
+    }
+
+    let active = true;
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.referrerPolicy = "no-referrer";
+    img.src = heroBgUrl;
+
+    img.onload = () => {
+      if (!active) return;
+      try {
+        const canvas = document.createElement("canvas");
+        canvas.width = 16;
+        canvas.height = 16;
+        const ctx = canvas.getContext("2d", { willReadFrequently: true });
+        if (!ctx) return;
+        ctx.drawImage(img, 0, 0, 16, 16);
+        const data = ctx.getImageData(0, 0, 16, 16).data;
+        let totalLum = 0;
+        let count = 0;
+        for (let i = 0; i < data.length; i += 4) {
+          const r = data[i]!;
+          const g = data[i + 1]!;
+          const b = data[i + 2]!;
+          totalLum += 0.299 * r + 0.587 * g + 0.114 * b;
+          count++;
+        }
+        const avgLum = totalLum / count;
+        // Below 135 luminance means dark background -> switch City & Temp text to white
+        setIsDarkArtwork(avgLum < 135);
+      } catch {
+        // If CORS restricts canvas pixel reading, fall back to day/night condition
+        setIsDarkArtwork(!w?.current?.is_day);
+      }
+    };
+
+    img.onerror = () => {
+      if (!active) return;
+      setIsDarkArtwork(!w?.current?.is_day);
+    };
+
+    return () => {
+      active = false;
+    };
+  }, [heroBgUrl, w?.current?.is_day]);
 
   const handleSelectBackground = (url: string) => {
     setHeroBgUrl(url);
@@ -288,6 +340,27 @@ export const WeatherView: React.FC<WeatherViewProps> = ({
     }
   };
 
+  // Dynamic contrast classes based on artwork brightness
+  const cityTextColor = isDarkArtwork
+    ? "text-white drop-shadow-[0_2px_8px_rgba(0,0,0,0.85)]"
+    : "text-slate-900 drop-shadow-[0_1px_3px_rgba(255,255,255,0.95)]";
+
+  const tempTextColor = isDarkArtwork
+    ? "text-white drop-shadow-[0_2px_12px_rgba(0,0,0,0.85)]"
+    : "text-slate-900 drop-shadow-[0_1px_4px_rgba(255,255,255,0.95)]";
+
+  const tempUnitColor = isDarkArtwork
+    ? "text-white/90 drop-shadow-[0_2px_8px_rgba(0,0,0,0.85)]"
+    : "text-slate-800 drop-shadow-[0_1px_3px_rgba(255,255,255,0.95)]";
+
+  const pillGlassBg = isDarkArtwork
+    ? "bg-black/50 text-white border-white/20"
+    : "bg-white/80 text-slate-800 border-slate-300/60";
+
+  const actionBtnGlassBg = isDarkArtwork
+    ? "bg-black/50 text-white border-white/25 hover:bg-black/65"
+    : "bg-white/85 text-slate-800 border-slate-300/70 hover:bg-white";
+
   return (
     <div className="space-y-4">
       {/* 1. DISASTER & ADVISORY ALERT TICKER */}
@@ -342,26 +415,26 @@ export const WeatherView: React.FC<WeatherViewProps> = ({
           <div className="flex items-start justify-between">
             <div>
               <div className="flex items-center gap-2">
-                <h2 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-foreground drop-shadow-sm">
+                <h2 className={`text-2xl sm:text-3xl font-extrabold tracking-tight transition-colors duration-300 ${cityTextColor}`}>
                   {w.place.name}
                 </h2>
                 {w.place.country && (
-                  <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-background/80 backdrop-blur-md text-foreground/80 border border-border/50 shadow-xs">
+                  <span className={`text-xs font-semibold px-2 py-0.5 rounded-full backdrop-blur-md border shadow-xs transition-colors duration-300 ${pillGlassBg}`}>
                     {w.place.country}
                   </span>
                 )}
               </div>
-              <p className="inline-block text-[11px] font-medium text-foreground/80 mt-1 px-2 py-0.5 rounded-full bg-background/70 backdrop-blur-md border border-border/40 shadow-xs">
+              <p className={`inline-block text-[11px] font-medium mt-1 px-2 py-0.5 rounded-full backdrop-blur-md border shadow-xs transition-colors duration-300 ${pillGlassBg}`}>
                 {formatTimeAgo(w.fetchedAt, t)}
               </p>
             </div>
 
             <div className="flex items-center gap-2">
-              <div className="inline-flex items-center rounded-xl bg-background/85 backdrop-blur-md border border-border/60 shadow-xs p-0.5">
+              <div className={`inline-flex items-center rounded-xl backdrop-blur-md border shadow-xs p-0.5 transition-colors duration-300 ${actionBtnGlassBg}`}>
                 <button
                   type="button"
                   onClick={() => setGalleryOpen(true)}
-                  className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold text-foreground hover:bg-muted/60 rounded-lg transition cursor-pointer"
+                  className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold hover:opacity-80 rounded-lg transition cursor-pointer"
                   title={t("art_gallery", "AI Gallery")}
                 >
                   <span className="text-sm">🎨</span>
@@ -370,7 +443,7 @@ export const WeatherView: React.FC<WeatherViewProps> = ({
                 <button
                   type="button"
                   onClick={handleNextArtwork}
-                  className="px-2 py-1 text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted/60 rounded-lg transition border-l border-border/50 cursor-pointer"
+                  className="px-2 py-1 text-xs font-medium hover:opacity-80 rounded-lg transition border-l border-current/20 cursor-pointer"
                   title={t("next_art", "Next Artwork")}
                 >
                   <span>↻</span>
@@ -381,7 +454,7 @@ export const WeatherView: React.FC<WeatherViewProps> = ({
                 type="button"
                 onClick={onRefresh}
                 disabled={loading}
-                className="p-1.5 rounded-xl bg-background/85 backdrop-blur-md border border-border/60 text-muted-foreground hover:text-foreground shadow-xs transition disabled:opacity-50 cursor-pointer"
+                className={`p-1.5 rounded-xl backdrop-blur-md border shadow-xs transition disabled:opacity-50 cursor-pointer ${actionBtnGlassBg}`}
                 title={t("refresh", "Refresh forecast")}
               >
                 <span className={`inline-block text-sm ${loading ? "animate-spin" : ""}`}>
@@ -394,18 +467,18 @@ export const WeatherView: React.FC<WeatherViewProps> = ({
           <div className="flex items-end justify-between pt-2">
             <div>
               <div className="flex items-baseline gap-1">
-                <span className="text-5xl sm:text-6xl font-extrabold tracking-tighter text-foreground drop-shadow-sm">
+                <span className={`text-5xl sm:text-6xl font-extrabold tracking-tighter transition-colors duration-300 ${tempTextColor}`}>
                   {tempVal}
                 </span>
-                <span className="text-2xl font-bold text-foreground/80 drop-shadow-xs">
+                <span className={`text-2xl font-bold transition-colors duration-300 ${tempUnitColor}`}>
                   {tempUnitStr}
                 </span>
               </div>
               <div className="mt-1 flex flex-wrap items-center gap-2">
-                <span className="inline-block text-base font-bold text-foreground px-2.5 py-0.5 rounded-xl bg-background/75 backdrop-blur-md border border-border/40 shadow-xs">
+                <span className={`inline-block text-base font-bold px-2.5 py-0.5 rounded-xl backdrop-blur-md border shadow-xs transition-colors duration-300 ${pillGlassBg}`}>
                   {conditionLabel}
                 </span>
-                <span className="inline-block text-xs font-semibold text-foreground/85 px-2 py-0.5 rounded-full bg-background/75 backdrop-blur-md border border-border/40 shadow-xs">
+                <span className={`inline-block text-xs font-semibold px-2 py-0.5 rounded-full backdrop-blur-md border shadow-xs transition-colors duration-300 ${pillGlassBg}`}>
                   {t("feels_like", "Feels like")} {feelsVal}{tempUnitStr}
                 </span>
               </div>
@@ -417,7 +490,7 @@ export const WeatherView: React.FC<WeatherViewProps> = ({
                 isDay={w.current.is_day}
                 className="w-18 h-18 sm:w-20 sm:h-20 drop-shadow-lg"
               />
-              <span className="text-[11px] font-semibold text-foreground mt-1 px-2.5 py-0.5 rounded-full bg-background/80 backdrop-blur-md border border-border/40 shadow-xs">
+              <span className={`text-[11px] font-semibold mt-1 px-2.5 py-0.5 rounded-full backdrop-blur-md border shadow-xs transition-colors duration-300 ${pillGlassBg}`}>
                 {dayLabel}
               </span>
             </div>
