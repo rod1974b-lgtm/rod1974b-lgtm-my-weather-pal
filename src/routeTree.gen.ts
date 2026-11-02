@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as PrivacyRouteImport } from './routes/privacy'
+import { Route as ApiGenerateWatercolorRouteImport } from './routes/api/generate-watercolor'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -22,31 +23,40 @@ const PrivacyRoute = PrivacyRouteImport.update({
   path: '/privacy',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiGenerateWatercolorRoute = ApiGenerateWatercolorRouteImport.update({
+  id: '/api/generate-watercolor',
+  path: '/api/generate-watercolor',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/privacy': typeof PrivacyRoute
+  '/api/generate-watercolor': typeof ApiGenerateWatercolorRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/privacy': typeof PrivacyRoute
+  '/api/generate-watercolor': typeof ApiGenerateWatercolorRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/privacy': typeof PrivacyRoute
+  '/api/generate-watercolor': typeof ApiGenerateWatercolorRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/privacy'
+  fullPaths: '/' | '/privacy' | '/api/generate-watercolor'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/privacy'
-  id: '__root__' | '/' | '/privacy'
+  to: '/' | '/privacy' | '/api/generate-watercolor'
+  id: '__root__' | '/' | '/privacy' | '/api/generate-watercolor'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   PrivacyRoute: typeof PrivacyRoute
+  ApiGenerateWatercolorRoute: typeof ApiGenerateWatercolorRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -65,12 +75,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PrivacyRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/generate-watercolor': {
+      id: '/api/generate-watercolor'
+      path: '/api/generate-watercolor'
+      fullPath: '/api/generate-watercolor'
+      preLoaderRoute: typeof ApiGenerateWatercolorRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   PrivacyRoute: PrivacyRoute,
+  ApiGenerateWatercolorRoute: ApiGenerateWatercolorRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
