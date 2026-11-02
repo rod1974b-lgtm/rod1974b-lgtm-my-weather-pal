@@ -28,7 +28,8 @@ export const Route = createFileRoute("/")({
     meta: [
       {
         name: "description",
-        content: "Minimalist, account-free weather app featuring curated AI watercolor backgrounds and live meteorological advisories.",
+        content:
+          "Minimalist, account-free weather app featuring curated AI watercolor backgrounds and live meteorological advisories.",
       },
       { property: "og:title", content: "My Weather Pal — Private Weather" },
       {
@@ -78,29 +79,30 @@ async function fetchUSGSEarthquakes(lat: number, lon: number): Promise<TickerAle
           Math.sin(dLon / 2) ** 2;
       const distKm = 6371 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 
-      if (distKm <= 1200) {
+      if (distKm <= 1200 && mag >= 4.5) {
         nearby.push({
           id: `eq-${f.id}`,
-          text: `USGS Seismic Bulletin: M${mag.toFixed(1)} earthquake recorded ~${Math.round(distKm)}km away (${placeName}).`,
-          severity: "disaster",
-          tag: "Earthquake Alert",
-          tagKey: "alert_tag_earthquake",
+          severity: mag >= 6.0 ? "danger" : "warning",
+          category: "earthquake",
+          source: "USGS",
+          headline: `M${mag.toFixed(1)} Earthquake • ${placeName} (${Math.round(distKm)}km away)`,
+          urgency: "Immediate",
         });
       }
     }
-    return nearby;
+    return nearby.slice(0, 3);
   } catch {
     return [];
   }
 }
 
-// Fetch US National Weather Service alerts
+// Fetch NWS Active Alerts (US locations)
 async function fetchNWSAlerts(lat: number, lon: number): Promise<TickerAlertItem[]> {
   try {
     const res = await fetch(
       `https://api.weather.gov/alerts/active?point=${lat.toFixed(4)},${lon.toFixed(4)}`,
       {
-        headers: { "User-Agent": "MyWeatherPal/1.0 (rod1974b@gmail.com)" },
+        headers: { "User-Agent": "MyWeatherPal/1.0" },
         signal: AbortSignal.timeout(4000),
       }
     );
@@ -108,46 +110,51 @@ async function fetchNWSAlerts(lat: number, lon: number): Promise<TickerAlertItem
     const data = await res.json();
     const features = data?.features || [];
 
-    return features.map((f: any) => ({
-      id: `nws-${f.id || Math.random()}`,
-      text: `NWS Alert: ${f.properties?.headline || f.properties?.event || "Active Severe Weather Warning"}`,
-      severity: "disaster",
-      tag: f.properties?.event || "NWS Watch",
-      tagKey: "alert_tag_nws",
+    return features.slice(0, 3).map((f: any) => ({
+      id: f.id || String(Math.random()),
+      severity: f.properties?.severity === "Extreme" ? "danger" : "warning",
+      category: "weather",
+      source: "NWS",
+      headline: f.properties?.headline || f.properties?.event || "Severe Weather Advisory",
+      urgency: f.properties?.urgency || "Expected",
     }));
   } catch {
     return [];
   }
 }
 
-// Fetch TMD Warnings (Thailand)
-async function fetchTMDWarnings(country?: string): Promise<TickerAlertItem[]> {
+// Fetch TMD Weather Warnings (Thailand)
+async function fetchTMDWarnings(country: string): Promise<TickerAlertItem[]> {
   if (!country || !country.toLowerCase().includes("thailand")) return [];
   try {
-    const res = await fetch("https://data.tmd.go.th/api/WeatherWarning/v2/?uid=api&ukey=api&format=json", {
-      signal: AbortSignal.timeout(3500),
-    });
+    const res = await fetch(
+      "https://data.tmd.go.th/api/WeatherWarning/v2/?uid=api&ukey=api&format=json",
+      { signal: AbortSignal.timeout(4000) }
+    );
     if (!res.ok) return [];
     const data = await res.json();
-    const warnings = data?.warningnews || [];
-    if (warnings.length > 0) {
-      const top = warnings[0];
-      return [
-        {
-          id: `tmd-${top.id || 1}`,
-          text: `TMD Warning: ${top.title || "Monsoon & Heavy Rain Warning for Thailand"}`,
-          severity: "disaster",
-          tag: "TMD Alert",
-          tagKey: "alert_tag_tmd",
-        },
-      ];
-    }
-  } catch {}
-  return [];
+    const warnings = data?.DailyWeatherWarning?.WarningList || [];
+    if (!warnings.length) return [];
+
+    const first = warnings[0];
+    const title = first?.TitleEng || first?.TitleThai || "TMD Monsoon & Rain Warning";
+    return [
+      {
+        id: "tmd-warning",
+        severity: "warning",
+        category: "monsoon",
+        source: "TMD Thailand",
+        headline: title,
+        urgency: "Expected",
+      },
+    ];
+  } catch {
+    return [];
+  }
 }
 
-// Fetch Open-Meteo Flood/River discharge anomaly
-async function fetchRiverDischargeAlert(lat: number, lon: number): Promise<TickerAlertItem[]> {
+// Fetch Open-Meteo River Discharge & Flood Alerts
+async function fetchRiverDischarge(lat: number, lon: number): Promise<TickerAlertItem[]> {
   try {
     const res = await fetch(
       `https://flood-api.open-meteo.com/v1/flood?latitude=${lat.toFixed(4)}&longitude=${lon.toFixed(4)}&daily=river_discharge,river_discharge_mean&forecast_days=3`,
@@ -155,22 +162,24 @@ async function fetchRiverDischargeAlert(lat: number, lon: number): Promise<Ticke
     );
     if (!res.ok) return [];
     const data = await res.json();
-    const daily = data?.daily;
-    if (!daily || !daily.river_discharge || !daily.river_discharge_mean) return [];
+    const discharges = data?.daily?.river_discharge || [];
+    const means = data?.daily?.river_discharge_mean || [];
 
-    const todayDischarge = daily.river_discharge[0] ?? 0;
-    const meanDischarge = daily.river_discharge_mean[0] ?? 1;
-
-    if (meanDischarge > 10 && todayDischarge > meanDischarge * 2.5) {
-      return [
-        {
-          id: `flood-river-${lat}-${lon}`,
-          text: `Hydrological Alert: Local river discharge is elevated (${todayDischarge.toFixed(0)} m³/s, normal ~${meanDischarge.toFixed(0)} m³/s). River basin flood watch in effect.`,
-          severity: "disaster",
-          tag: "Flood Watch",
-          tagKey: "alert_tag_flood",
-        },
-      ];
+    if (discharges.length > 0 && means.length > 0) {
+      const currentQ = discharges[0];
+      const meanQ = means[0];
+      if (meanQ > 5 && currentQ > meanQ * 2.0) {
+        return [
+          {
+            id: `flood-river`,
+            severity: "warning",
+            category: "flood",
+            source: "Open-Meteo River Model",
+            headline: `Elevated River Flow (${Math.round(currentQ)} m³/s vs normal ${Math.round(meanQ)} m³/s) — Basin flood watch`,
+            urgency: "Future",
+          },
+        ];
+      }
     }
     return [];
   } catch {
@@ -178,347 +187,285 @@ async function fetchRiverDischargeAlert(lat: number, lon: number): Promise<Ticke
   }
 }
 
-// Derive meteorological advisories
-function deriveLocalWeatherAlerts(w: Weather): TickerAlertItem[] {
-  const alerts: TickerAlertItem[] = [];
+// Synthesize local weather warnings from current forecast
+function getLocalWeatherAdvisories(w: Weather | null): TickerAlertItem[] {
+  if (!w?.current) return [];
+  const items: TickerAlertItem[] = [];
   const code = w.current.code;
-  const wind = w.current.wind;
-  const gust = wind;
-  const aqi = w.current.aqi ?? 0;
-  const isImperial = w.unit === "imperial";
 
-  if (code >= 95) {
-    alerts.push({
-      id: "alert-storm",
-      text: "Severe Thunderstorm Warning: Cloud-to-ground lightning, high turbulence and sudden downdrafts expected in this cell.",
-      severity: "disaster",
-      tag: "Severe Thunderstorm",
-      tagKey: "alert_tag_thunderstorm",
+  if ([95, 96, 99].includes(code)) {
+    items.push({
+      id: "local-thunderstorm",
+      severity: "danger",
+      category: "storm",
+      source: "Live Radar",
+      headline: `Severe Thunderstorm & Lightning in effect for ${w.place.name}. Seek indoor shelter.`,
+      urgency: "Immediate",
     });
-  } else if (code === 65 || code === 67 || code === 82) {
-    alerts.push({
-      id: "alert-heavy-rain",
-      text: "Heavy Rainfall Watch: Localized runoff, reduced highway visibility and ponding water possible.",
-      severity: "disaster",
-      tag: "Heavy Rain",
-      tagKey: "alert_tag_heavy_rain",
-    });
-  }
-
-  const highWindThreshold = isImperial ? 28 : 45;
-  if (gust >= highWindThreshold) {
-    alerts.push({
-      id: "alert-wind",
-      text: `High Wind Advisory: Wind gusts clocked up to ${Math.round(gust)} ${isImperial ? "mph" : "km/h"}. Secure loose outdoor items.`,
+  } else if ([65, 82].includes(code)) {
+    items.push({
+      id: "local-heavy-rain",
       severity: "warning",
-      tag: "Wind Advisory",
-      tagKey: "alert_tag_wind",
+      category: "rain",
+      source: "Live Radar",
+      headline: `Heavy to very heavy rains active in ${w.place.name} — drive with extreme caution.`,
+      urgency: "Expected",
     });
-  }
-
-  if (aqi >= 150) {
-    alerts.push({
-      id: "alert-aqi",
-      text: `Air Quality Advisory: Elevated particulate levels (AQI ${aqi}). Sensitive groups should avoid prolonged outdoor exposure.`,
+  } else if ([75, 86].includes(code)) {
+    items.push({
+      id: "local-heavy-snow",
       severity: "warning",
-      tag: "Air Quality Alert",
-      tagKey: "alert_tag_aqi",
+      category: "snow",
+      source: "Live Radar",
+      headline: `Heavy snowfall warning in effect for ${w.place.name}. Expect reduced visibility.`,
+      urgency: "Expected",
     });
   }
 
-  return alerts;
+  if (w.current.wind && w.current.wind >= 45) {
+    items.push({
+      id: "local-high-wind",
+      severity: "warning",
+      category: "wind",
+      source: "Live Station",
+      headline: `High Wind Advisory: gusts up to ${Math.round(w.current.wind)} km/h recorded.`,
+      urgency: "Expected",
+    });
+  }
+
+  if (w.current.aqi && w.current.aqi >= 151) {
+    items.push({
+      id: "local-unhealthy-aqi",
+      severity: "warning",
+      category: "air-quality",
+      source: "Air Quality Station",
+      headline: `Unhealthy Air Quality (AQI ${w.current.aqi}). Sensitive groups should wear masks.`,
+      urgency: "Expected",
+    });
+  }
+
+  return items;
 }
 
 function Index() {
   const { t } = useTranslation();
-
-  // Core state
-  const [place, setPlace] = useState<Place>(DEFAULT_PLACE);
   const [unit, setUnit] = useState<WeatherUnit>("metric");
+  const [place, setPlace] = useState<Place>(DEFAULT_PLACE);
   const [weather, setWeather] = useState<Weather | null>(null);
-  const [favorites, setFavorites] = useState<Place[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Active Disaster Ticker Items
+  // Search autocomplete
+  const [query, setQuery] = useState<string>("");
+  const [suggestions, setSuggestions] = useState<Place[]>([]);
+  const [searching, setSearching] = useState<boolean>(false);
+
+  // Favorites
+  const [favorites, setFavorites] = useState<Place[]>([]);
+
+  // Alerts
   const [alerts, setAlerts] = useState<TickerAlertItem[]>([]);
 
-  // Search input state
-  const [q, setQ] = useState("");
-  const [suggestions, setSuggestions] = useState<Place[]>([]);
-  const [, setSearching] = useState(false);
-  const [searchOpen, setSearchOpen] = useState(false);
-
-  // Modals & active custom background
-  const [, setShowLocDialog] = useState(false);
-  const [showAiGallery, setShowAiGallery] = useState(false);
+  // Background and Sky Theme
   const [customBgUrl, setCustomBgUrl] = useState<string | null>(null);
+  const [skyPref, setSkyPref] = useState<string>("auto");
+  const [showAiGallery, setShowAiGallery] = useState<boolean>(false);
 
-  // Sky background override preference
-  const [skyPref, setSkyPref] = useState<string>(() => {
-    try {
-      return localStorage.getItem("weather:sky-pref") || "auto";
-    } catch {
-      return "auto";
-    }
-  });
-
-  // Listen to sky switcher events
+  // 1. Initial Preferences
   useEffect(() => {
+    setUnit(loadUnitPref());
+    setFavorites(loadFavorites());
+
+    try {
+      const storedSky = localStorage.getItem("weather:sky-pref") || "auto";
+      setSkyPref(storedSky);
+    } catch {}
+
     const handleSkyChange = (e: Event) => {
-      const customEvent = e as CustomEvent<string>;
-      if (customEvent.detail) {
-        setSkyPref(customEvent.detail);
+      const customEvent = e as CustomEvent<{ sky: string }>;
+      if (customEvent.detail?.sky) {
+        setSkyPref(customEvent.detail.sky);
       }
     };
     window.addEventListener("weather:sky-change", handleSkyChange);
     return () => window.removeEventListener("weather:sky-change", handleSkyChange);
   }, []);
 
-  // Compute active sky background
-  const activeSky =
-    skyPref !== "auto"
-      ? skyPref
-      : weather
-      ? skyKey(weather.current.code, weather.current.is_day)
-      : "clear-day";
+  // 2. Fetch Weather & All Disaster Feeds
+  const fetchAllWeatherData = async (targetPlace: Place, targetUnit: WeatherUnit) => {
+    setLoading(true);
+    setError(null);
+    try {
+      const data = await getWeather(targetPlace, targetUnit);
+      setWeather(data);
 
-  // Synchronize .dark mode class on root element
-  useEffect(() => {
-    if (typeof document === "undefined") return;
-    const isDarkSky =
-      activeSky === "clear-night" ||
-      activeSky === "cloudy-night" ||
-      activeSky === "storm";
+      const [eqAlerts, nwsAlerts, tmdAlerts, floodAlerts] = await Promise.all([
+        fetchUSGSEarthquakes(targetPlace.lat, targetPlace.lon),
+        fetchNWSAlerts(targetPlace.lat, targetPlace.lon),
+        fetchTMDWarnings(targetPlace.country || ""),
+        fetchRiverDischarge(targetPlace.lat, targetPlace.lon),
+      ]);
 
-    if (isDarkSky) {
-      document.documentElement.classList.add("dark");
-    } else {
-      document.documentElement.classList.remove("dark");
+      const localAlerts = getLocalWeatherAdvisories(data);
+      const combined = [...localAlerts, ...floodAlerts, ...tmdAlerts, ...nwsAlerts, ...eqAlerts];
+      setAlerts(combined);
+    } catch (err: any) {
+      setError(err?.message || "Failed to load weather forecast");
+    } finally {
+      setLoading(false);
     }
-  }, [activeSky]);
+  };
 
-  // Load preferences and favorites on mount
+  // Check if user came back from City Art Gallery with a selected city
   useEffect(() => {
     try {
-      const savedUnit = loadUnitPref();
-      if (savedUnit) setUnit(savedUnit);
-
-      const favs = loadFavorites();
-      if (favs && favs.length > 0 && favs[0]) {
-        setFavorites(favs);
-        setPlace(favs[0]);
+      const galleryCity = localStorage.getItem("weather:last-searched-city");
+      if (galleryCity) {
+        localStorage.removeItem("weather:last-searched-city");
+        searchCity(galleryCity).then((results) => {
+          if (results.length > 0) {
+            handleSelectPlace(results[0]);
+          }
+        });
       }
     } catch {}
   }, []);
 
-  // Restore saved artwork for the current city
+  // Trigger load on place or unit change
   useEffect(() => {
-    if (weather?.place?.name) {
-      try {
-        const saved = localStorage.getItem(`weather:custom-bg:${weather.place.name.toLowerCase().trim()}`);
-        setCustomBgUrl(saved || null);
-      } catch {
-        setCustomBgUrl(null);
+    fetchAllWeatherData(place, unit);
+  }, [place, unit]);
+
+  // Sync custom background from localStorage
+  useEffect(() => {
+    const key = `weather:custom-bg:${place.name.trim().toLowerCase()}`;
+    const saved = localStorage.getItem(key);
+    setCustomBgUrl(saved);
+
+    const handleCustomBgChange = (e: Event) => {
+      const customEvent = e as CustomEvent<{ city?: string; url?: string }>;
+      if (
+        !customEvent.detail?.city ||
+        customEvent.detail.city.toLowerCase() === place.name.trim().toLowerCase()
+      ) {
+        setCustomBgUrl(customEvent.detail?.url || null);
       }
-    }
-  }, [weather?.place?.name]);
-
-  // Handler for custom background selection & persistence
-  const handleSelectCustomBg = (url: string | null) => {
-    setCustomBgUrl(url);
-    if (weather?.place?.name) {
-      try {
-        const key = `weather:custom-bg:${weather.place.name.toLowerCase().trim()}`;
-        if (url) {
-          localStorage.setItem(key, url);
-        } else {
-          localStorage.removeItem(key);
-        }
-      } catch {}
-    }
-  };
-
-  // Fetch live weather data on place/unit change + auto-refresh every 10 min & on tab visibility
-  useEffect(() => {
-    let cancelled = false;
-
-    const loadWeatherData = (silent = false) => {
-      if (!silent) setLoading(true);
-      setError(null);
-
-      getWeather(place, unit)
-        .then((data) => {
-          if (!cancelled) {
-            setWeather(data);
-            setLoading(false);
-          }
-        })
-        .catch((err) => {
-          if (!cancelled) {
-            if (!silent) setError(err?.message || "Failed to load weather");
-            setLoading(false);
-          }
-        });
     };
+    window.addEventListener("weather:custom-bg-change", handleCustomBgChange);
+    return () => window.removeEventListener("weather:custom-bg-change", handleCustomBgChange);
+  }, [place]);
 
-    loadWeatherData(false);
-
-    // Auto-refresh interval (10 minutes) to keep live hourly forecast and weather updated
+  // Periodic Auto-Refresh (Every 10 minutes)
+  useEffect(() => {
     const interval = setInterval(() => {
-      loadWeatherData(true);
+      fetchAllWeatherData(place, unit);
     }, 10 * 60 * 1000);
 
-    // Re-check when user switches back to this tab
-    const handleVisibility = () => {
+    const onVisible = () => {
       if (document.visibilityState === "visible") {
-        loadWeatherData(true);
+        fetchAllWeatherData(place, unit);
       }
     };
-    document.addEventListener("visibilitychange", handleVisibility);
+    document.addEventListener("visibilitychange", onVisible);
 
     return () => {
-      cancelled = true;
       clearInterval(interval);
-      document.removeEventListener("visibilitychange", handleVisibility);
+      document.removeEventListener("visibilitychange", onVisible);
     };
   }, [place, unit]);
 
-  // Fetch real-time disasters and advisories
+  // Debounced City Search
   useEffect(() => {
-    let cancelled = false;
-
-    async function loadDisasters() {
-      const results = await Promise.allSettled([
-        fetchUSGSEarthquakes(place.lat, place.lon),
-        fetchNWSAlerts(place.lat, place.lon),
-        fetchTMDWarnings(place.country),
-        fetchRiverDischargeAlert(place.lat, place.lon),
-      ]);
-
-      if (cancelled) return;
-
-      const combined: TickerAlertItem[] = [];
-      for (const res of results) {
-        if (res.status === "fulfilled") {
-          combined.push(...res.value);
-        }
-      }
-
-      if (weather) {
-        combined.push(...deriveLocalWeatherAlerts(weather));
-      }
-
-      const unique = Array.from(new Map(combined.map((item) => [item.id, item])).values());
-      setAlerts(unique);
-    }
-
-    loadDisasters();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [place, weather]);
-
-  // Debounced search for cities
-  useEffect(() => {
-    if (!q.trim() || q.trim().length < 2) {
+    if (!query.trim() || query.length < 2) {
       setSuggestions([]);
+      setSearching(false);
       return;
     }
-
     setSearching(true);
-    const timer = setTimeout(() => {
-      searchCity(q)
-        .then((items) => {
-          setSuggestions(items || []);
-          setSearching(false);
-        })
-        .catch(() => {
-          setSuggestions([]);
-          setSearching(false);
-        });
+    const timer = setTimeout(async () => {
+      const results = await searchCity(query);
+      setSuggestions(results);
+      setSearching(false);
     }, 280);
-
     return () => clearTimeout(timer);
-  }, [q]);
+  }, [query]);
 
-  // Geolocation handler
+  // Geolocation lookup
   const handleUseLocation = () => {
     if (!navigator.geolocation) {
       alert("Geolocation is not supported by your browser");
       return;
     }
-
+    setLoading(true);
     navigator.geolocation.getCurrentPosition(
       async (pos) => {
-        const lat = pos.coords.latitude;
-        const lon = pos.coords.longitude;
-        let detectedName = "My Location";
+        const { latitude: lat, longitude: lon } = pos.coords;
+        let detectedName = "Current Location";
+        let detectedCountry = "";
 
         try {
-          const revRes = await fetch(
+          const res = await fetch(
             `https://photon.komoot.io/reverse?lat=${lat}&lon=${lon}`,
-            { signal: AbortSignal.timeout(3000) }
+            { signal: AbortSignal.timeout(3500) }
           );
-          if (revRes.ok) {
-            const revData = await revRes.json();
-            const feat = revData?.features?.[0]?.properties;
-            if (feat) {
-              detectedName = feat.city || feat.name || feat.county || detectedName;
+          if (res.ok) {
+            const data = await res.json();
+            const first = data?.features?.[0]?.properties;
+            if (first) {
+              detectedName = first.city || first.town || first.name || detectedName;
+              detectedCountry = first.country || "";
             }
           }
         } catch {}
 
         setPlace({
           name: detectedName,
+          country: detectedCountry,
           lat,
           lon,
         });
-        setShowLocDialog(false);
       },
       () => {
-        alert("Unable to retrieve your location");
+        setLoading(false);
+        alert("Unable to retrieve your location. Please check device permissions.");
       },
       { timeout: 8000 }
     );
   };
 
-  // Toggle favorite
+  const handleSelectPlace = (p: Place) => {
+    setPlace(p);
+    setQuery("");
+    setSuggestions([]);
+  };
+
   const handleToggleFavorite = () => {
-    let next: Place[];
-    if (isFavorite(place, favorites)) {
-      next = favorites.filter((f) => !isSamePlace(f, place));
+    const updated = isFavorite(favorites, place)
+      ? favorites.filter((f) => !isSamePlace(f, place))
+      : [...favorites, place];
+    setFavorites(updated);
+    saveFavorites(updated);
+  };
+
+  const handleSelectCustomBg = (url: string) => {
+    const key = `weather:custom-bg:${place.name.trim().toLowerCase()}`;
+    if (!url) {
+      localStorage.removeItem(key);
+      setCustomBgUrl(null);
     } else {
-      next = [place, ...favorites.slice(0, 7)];
+      localStorage.setItem(key, url);
+      setCustomBgUrl(url);
     }
-    setFavorites(next);
-    saveFavorites(next);
-  };
-
-  // Refresh current forecast
-  const handleRefresh = () => {
-    setLoading(true);
-    getWeather(place, unit)
-      .then((data) => {
-        setWeather(data);
-        setLoading(false);
+    window.dispatchEvent(
+      new CustomEvent("weather:custom-bg-change", {
+        detail: { city: place.name, url },
       })
-      .catch((err) => {
-        setError(err?.message || "Failed to load weather");
-        setLoading(false);
-      });
+    );
   };
 
-  // Search submit
-  const onSearchSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (suggestions.length > 0 && suggestions[0]) {
-      setPlace(suggestions[0]);
-      setQ("");
-      setSearchOpen(false);
-    }
-  };
+  // Determine active sky theme
+  const autoSky = weather ? skyKey(weather.current.code, weather.current.is_day) : "day";
+  const activeSky = skyPref === "auto" ? autoSky : skyPref;
 
   return (
     <div className={`min-h-screen text-foreground sky sky-${activeSky} transition-colors duration-500`}>
@@ -538,6 +485,17 @@ function Index() {
           </div>
 
           <div className="flex items-center gap-2">
+            {/* Direct City Art Gallery Link */}
+            <Link
+              to="/gallery"
+              className="inline-flex items-center gap-1 rounded-full border border-border/80 bg-background/90 px-2.5 py-1 text-xs font-semibold shadow-xs hover:bg-muted transition-colors cursor-pointer"
+              title="Browse City Art Gallery"
+            >
+              <span>🎨</span>
+              <span className="hidden sm:inline">City Art</span>
+            </Link>
+
+            {/* AI Generator Modal Trigger */}
             <button
               type="button"
               onClick={() => setShowAiGallery(true)}
@@ -546,6 +504,7 @@ function Index() {
               <span>✨</span>
               <span className="hidden sm:inline">{t("art_gallery", "AI Gallery")}</span>
             </button>
+
             <LanguageSelector />
             <AppMenu
               unit={unit}
@@ -558,125 +517,116 @@ function Index() {
         </div>
       </header>
 
-      {/* Main Container */}
+      {/* Main Content Area */}
       <main className="mx-auto max-w-4xl px-4 py-5 sm:px-6 space-y-4">
         {/* Search & Location Bar */}
         <section className="relative">
-          <form onSubmit={onSearchSubmit} className="relative flex items-center">
-            <input
-              type="text"
-              value={q}
-              onChange={(e) => {
-                setQ(e.target.value);
-                setSearchOpen(true);
-              }}
-              onFocus={() => setSearchOpen(true)}
-              placeholder={t("search_placeholder", "Search city or landmark...")}
-              className="w-full rounded-2xl border border-border/80 bg-card/90 px-4 py-2.5 pr-20 text-sm shadow-xs backdrop-blur-sm placeholder:text-muted-foreground focus:outline-hidden focus:ring-2 focus:ring-primary/40 transition-all text-card-foreground"
-            />
-            <div className="absolute right-2 flex items-center gap-1">
-              <button
-                type="submit"
-                aria-label="Search"
-                className="rounded-xl p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors cursor-pointer"
-              >
-                🔍
-              </button>
-              <button
-                type="button"
-                onClick={handleUseLocation}
-                title={t("use_my_location", "Use GPS Location")}
-                className="rounded-xl p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors cursor-pointer"
-              >
-                📍
-              </button>
+          <div className="flex gap-2">
+            <div className="relative flex-1">
+              <input
+                type="text"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder={t("search_placeholder", "Search city or landmark...")}
+                className="w-full rounded-2xl border border-border/80 bg-card px-4 py-2.5 pl-10 text-sm shadow-xs transition-colors placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
+              />
+              <span className="absolute left-3.5 top-3 text-muted-foreground text-sm">🔍</span>
+              {searching && (
+                <span className="absolute right-3.5 top-3 text-xs text-muted-foreground animate-spin">
+                  ⏳
+                </span>
+              )}
             </div>
-          </form>
 
-          {/* Search Suggestions Dropdown */}
-          {searchOpen && suggestions.length > 0 && (
-            <div className="absolute left-0 right-0 top-full z-30 mt-1 max-h-64 overflow-y-auto rounded-xl border border-border/80 bg-popover shadow-lg">
-              {suggestions.map((item, idx) => (
+            <button
+              type="button"
+              onClick={handleUseLocation}
+              title={t("use_location", "Use My Location")}
+              className="flex items-center justify-center rounded-2xl border border-border/80 bg-card px-4 py-2.5 text-sm shadow-xs transition-colors hover:bg-muted cursor-pointer"
+            >
+              📍
+            </button>
+          </div>
+
+          {/* Autocomplete Suggestions Dropdown */}
+          {suggestions.length > 0 && (
+            <div className="absolute left-0 right-0 top-full z-50 mt-1.5 overflow-hidden rounded-2xl border border-border bg-popover shadow-xl backdrop-blur-md">
+              {suggestions.map((s, idx) => (
                 <button
-                  key={`${item.lat}-${item.lon}-${idx}`}
+                  key={`${s.name}-${s.lat}-${idx}`}
                   type="button"
-                  onClick={() => {
-                    setPlace(item);
-                    setQ("");
-                    setSearchOpen(false);
-                  }}
-                  className="flex w-full items-center justify-between px-4 py-2.5 text-left text-sm hover:bg-muted transition-colors border-b last:border-b-0 border-border/50 cursor-pointer text-popover-foreground"
+                  onClick={() => handleSelectPlace(s)}
+                  className="flex w-full items-center justify-between px-4 py-2.5 text-left text-sm hover:bg-muted transition-colors border-b border-border/40 last:border-0"
                 >
-                  <span className="font-medium">{item.name}</span>
-                  {item.country && (
-                    <span className="text-xs text-muted-foreground">{item.country}</span>
-                  )}
+                  <span className="font-medium text-foreground">{s.name}</span>
+                  <span className="text-xs text-muted-foreground">{s.country}</span>
                 </button>
               ))}
             </div>
           )}
         </section>
 
-        {/* Saved Favorites Chips */}
+        {/* Favorite Cities Bar */}
         {favorites.length > 0 && (
-          <div className="flex flex-wrap items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
-            {favorites.map((fav, idx) => {
-              const active = isSamePlace(fav, place);
-              return (
-                <button
-                  key={`${fav.name}-${idx}`}
-                  type="button"
-                  onClick={() => setPlace(fav)}
-                  className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-semibold transition-all cursor-pointer ${
-                    active
-                      ? "bg-primary text-primary-foreground shadow-xs"
-                      : "border border-border/70 bg-card/80 text-card-foreground hover:bg-muted"
-                  }`}
-                >
-                  <span>{fav.name.split(",")[0]}</span>
-                </button>
-              );
-            })}
-          </div>
+          <section className="flex items-center gap-2">
+            <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              {t("favorites", "Favorites")}:
+            </span>
+            <div className="flex flex-wrap items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
+              {favorites.map((fav) => {
+                const isSelected = isSamePlace(fav, place);
+                return (
+                  <button
+                    key={`${fav.name}-${fav.lat}`}
+                    type="button"
+                    onClick={() => handleSelectPlace(fav)}
+                    className={`rounded-full px-3 py-1 text-xs font-medium transition-all ${
+                      isSelected
+                        ? "bg-primary text-primary-foreground shadow-xs"
+                        : "border border-border/80 bg-card hover:bg-muted text-foreground"
+                    }`}
+                  >
+                    {fav.name}
+                  </button>
+                );
+              })}
+            </div>
+          </section>
         )}
 
-        {/* Error message */}
+        {/* Error Notification */}
         {error && (
-          <div className="rounded-xl border border-destructive/40 bg-destructive/10 p-4 text-center text-sm text-destructive">
-            <p>{error}</p>
-            <button
-              type="button"
-              onClick={handleRefresh}
-              className="mt-3 inline-flex items-center gap-1 rounded-lg bg-destructive px-3 py-1.5 text-xs text-destructive-foreground hover:bg-destructive/90 cursor-pointer"
-            >
-              Try Again
-            </button>
+          <div className="rounded-2xl border border-destructive/50 bg-destructive/10 p-4 text-sm text-destructive">
+            ⚠️ {error}
           </div>
         )}
 
-        {/* Weather Forecast View */}
-        {weather ? (
+        {/* Weather View Section */}
+        {weather && (
           <WeatherView
             weather={weather}
             activeAlerts={alerts}
-            unit={unit}
             loading={loading}
-            onRefresh={handleRefresh}
-            onSelectBg={handleSelectCustomBg}
+            onRefresh={() => fetchAllWeatherData(place, unit)}
+            isFav={isFavorite(favorites, place)}
+            onToggleFavorite={handleToggleFavorite}
             onSelectBackground={handleSelectCustomBg}
+            onOpenAiGallery={() => setShowAiGallery(true)}
+            customBgUrl={customBgUrl}
           />
-        ) : null}
+        )}
       </main>
 
-      {/* AI & Landmark Art Gallery Modal */}
+      {/* AI Gallery Modal */}
       {weather && (
         <AiGalleryModal
           isOpen={showAiGallery}
           onClose={() => setShowAiGallery(false)}
           cityName={weather.place.name}
-          weatherDesc={describe(weather.current.code).label}
+          country={weather.place.country}
+          weatherDesc={describe(weather.current.code)}
           weatherCode={weather.current.code}
-          tempC={
+          currentTemp={
             weather.unit === "imperial"
               ? ((weather.current.temp - 32) * 5) / 9
               : weather.current.temp
@@ -694,6 +644,10 @@ function Index() {
           {t("weather_by", "Weather data by Open-Meteo • AI Watercolor Art")}
         </p>
         <div className="mt-2 flex justify-center gap-4">
+          <Link to="/gallery" className="hover:underline">
+            🎨 {t("city_art_gallery", "City Art Gallery")}
+          </Link>
+          <span>•</span>
           <Link to="/privacy" className="hover:underline">
             {t("privacy_policy", "Privacy Policy")}
           </Link>
@@ -702,3 +656,5 @@ function Index() {
     </div>
   );
 }
+
+export default Index;
