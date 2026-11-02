@@ -1,5 +1,5 @@
 // src/components/AiGalleryModal.tsx
-import { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import {
   getAllAvailableArtworks,
@@ -27,14 +27,167 @@ interface AiGalleryModalProps {
   onSelectBg?: (url: string) => void;
 }
 
-interface SavedArtItem {
+export interface SavedArtItem {
   id: string;
   url: string;
   label: string;
-  date?: string;
+  date: string;
+  city?: string;
+  timestamp: number;
 }
 
-const STORAGE_SAVED_KEY = "weather:custom-art-saved";
+const DB_NAME = "WeatherPalArtDB";
+const DB_VERSION = 1;
+const STORE_NAME = "artworks";
+const LEGACY_STORAGE_KEY = "weather:custom-art-saved";
+
+// --- INDEXED DB ENGINE ---
+function openArtworkDB(): Promise<IDBDatabase> {
+  return new Promise((resolve, reject) => {
+    if (typeof window === "undefined" || !window.indexedDB) {
+      reject(new Error("IndexedDB is not supported in this browser."));
+      return;
+    }
+
+    const request = window.indexedDB.open(DB_NAME, DB_VERSION);
+
+    request.onupgradeneeded = (event) => {
+      const db = (event.target as IDBOpenDBRequest).result;
+      if (!db.objectStoreNames.contains(STORE_NAME)) {
+        const store = db.createObjectStore(STORE_NAME, { keyPath: "id" });
+        store.createIndex("timestamp", "timestamp", { unique: false });
+        store.createIndex("city", "city", { unique: false });
+      }
+    };
+
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
+}
+
+async function getAllSavedArtworksFromDB(): Promise<SavedArtItem[]> {
+  try {
+    const db = await openArtworkDB();
+    const items: SavedArtItem[] = await new Promise((resolve, reject) => {
+      const tx = db.transaction(STORE_NAME, "readonly");
+      const store = tx.objectStore(STORE_NAME);
+      const req = store.getAll();
+
+      req.onsuccess = () => resolve(req.result || []);
+      req.onerror = () => reject(req.error);
+    });
+
+    // Check for legacy localStorage items and migrate them into IndexedDB
+    try {
+      const legacyRaw = localStorage.getItem(LEGACY_STORAGE_KEY);
+      if (legacyRaw) {
+        const legacyList = JSON.parse(legacyRaw);
+        if (Array.isArray(legacyList) && legacyList.length > 0) {
+          for (const item of legacyList) {
+            if (item?.url && !items.some((i) => i.url === item.url)) {
+              const migratedItem: SavedArtItem = {
+                id: item.id || Date.now().toString() + Math.random().toString(36).slice(2, 6),
+                url: item.url,
+                label: item.label || "Saved Art",
+                date: item.date || new Date().toLocaleDateString(),
+                timestamp: Date.now(),
+              };
+              await saveArtworkToDB(migratedItem);
+              items.push(migratedItem);
+            }
+          }
+          localStorage.removeItem(LEGACY_STORAGE_KEY);
+        }
+      }
+    } catch {}
+
+    // Sort newest first
+    return items.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+  } catch (e) {
+    console.warn("IndexedDB read failed, falling back to empty:", e);
+    return [];
+  }
+}
+
+async function saveArtworkToDB(item: SavedArtItem): Promise<void> {
+  const db = await openArtworkDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE_NAME, "readwrite");
+    const store = tx.objectStore(STORE_NAME);
+    const req = store.put(item);
+
+    req.onsuccess = () => resolve();
+    req.onerror = () => reject(req.error);
+  });
+}
+
+async function deleteArtworkFromDB(id: string): Promise<void> {
+  const db = await openArtworkDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE_NAME, "readwrite");
+    const store = tx.objectStore(STORE_NAME);
+    const req = store.delete(id);
+
+    req.onsuccess = () => resolve();
+    req.onerror = () => reject(req.error);
+  });
+}
+
+async function clearAllArtworksFromDB(): Promise<void> {
+  const db = await openArtworkDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE_NAME, "readwrite");
+    const store = tx.objectStore(STORE_NAME);
+    const req = store.clear();
+
+    req.onsuccess = () => resolve();
+    req.onerror = () => reject(req.error);
+  });
+}
+
+// Compress uploaded photo to 1280px max for fast rendering and minimal storage
+function optimizeImageFile(file: File, maxDim = 1280, quality = 0.88): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const img = new Image();
+      img.onload = () => {
+        let width = img.width;
+        let height = img.height;
+
+        if (width > maxDim || height > maxDim) {
+          if (width > height) {
+            height = Math.round((height * maxDim) / width);
+            width = maxDim;
+          } else {
+            width = Math.round((width * maxDim) / height);
+            height = maxDim;
+          }
+        }
+
+        const canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) {
+          resolve(reader.result as string);
+          return;
+        }
+
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = "high";
+        ctx.drawImage(img, 0, 0, width, height);
+
+        const dataUrl = canvas.toDataURL("image/jpeg", quality);
+        resolve(dataUrl);
+      };
+      img.onerror = () => resolve(reader.result as string);
+      img.src = reader.result as string;
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
 
 export function AiGalleryModal(props: AiGalleryModalProps) {
   const { t } = useTranslation();
@@ -56,7 +209,7 @@ export function AiGalleryModal(props: AiGalleryModalProps) {
   const [isGenerating, setIsGenerating] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  // Load curated artworks and persistent saved artwork collection
+  // Load curated artworks and persistent IndexedDB collection
   useEffect(() => {
     if (isOpen) {
       setErrorMessage(null);
@@ -96,17 +249,10 @@ export function AiGalleryModal(props: AiGalleryModalProps) {
 
       setCuratedList(normalized);
 
-      try {
-        const raw = localStorage.getItem(STORAGE_SAVED_KEY);
-        if (raw) {
-          const parsed = JSON.parse(raw);
-          if (Array.isArray(parsed)) {
-            setSavedArts(parsed);
-          }
-        }
-      } catch {
-        setSavedArts([]);
-      }
+      // Load saved artworks directly from IndexedDB
+      getAllSavedArtworksFromDB()
+        .then((items) => setSavedArts(items))
+        .catch(() => setSavedArts([]));
     }
   }, [isOpen, activeCity, props.weatherCode, props.weatherDesc, props.country]);
 
@@ -128,23 +274,28 @@ export function AiGalleryModal(props: AiGalleryModalProps) {
     handleClose();
   };
 
-  const handleClearSaved = () => {
+  const handleClearSaved = async () => {
     if (window.confirm("Remove all saved artworks from your gallery?")) {
-      localStorage.removeItem(STORAGE_SAVED_KEY);
-      setSavedArts([]);
+      try {
+        await clearAllArtworksFromDB();
+        setSavedArts([]);
+      } catch (err) {
+        console.error("Failed to clear DB:", err);
+      }
     }
   };
 
-  const handleDeleteSingleSaved = (id: string, e: React.MouseEvent) => {
+  const handleDeleteSingleSaved = async (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    const updated = savedArts.filter((item) => item.id !== id);
-    setSavedArts(updated);
     try {
-      localStorage.setItem(STORAGE_SAVED_KEY, JSON.stringify(updated));
-    } catch {}
+      await deleteArtworkFromDB(id);
+      setSavedArts((prev) => prev.filter((item) => item.id !== id));
+    } catch (err) {
+      console.error("Failed to delete art:", err);
+    }
   };
 
-  const handleSaveToCollection = (url: string, label: string, e?: React.MouseEvent) => {
+  const handleSaveToCollection = async (url: string, label: string, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
     if (!url) return;
 
@@ -153,52 +304,57 @@ export function AiGalleryModal(props: AiGalleryModalProps) {
     }
 
     const newArt: SavedArtItem = {
-      id: Date.now().toString(),
+      id: Date.now().toString() + Math.random().toString(36).slice(2, 6),
       url,
       label,
       date: new Date().toLocaleDateString(),
+      city: activeCity,
+      timestamp: Date.now(),
     };
 
-    const updated = [newArt, ...savedArts.slice(0, 19)];
-    setSavedArts(updated);
     try {
-      localStorage.setItem(STORAGE_SAVED_KEY, JSON.stringify(updated));
-    } catch {}
+      await saveArtworkToDB(newArt);
+      setSavedArts((prev) => [newArt, ...prev]);
+    } catch (err) {
+      console.error("Failed to save to collection:", err);
+    }
   };
 
   const handleUploadClick = () => {
     fileInputRef.current?.click();
   };
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    const reader = new FileReader();
-    reader.onload = () => {
-      const result = reader.result as string;
-      if (result) {
-        const newArt: SavedArtItem = {
-          id: Date.now().toString(),
-          url: result,
-          label: `${activeCity} — ${file.name.replace(/\.[^/.]+$/, "")}`,
-          date: new Date().toLocaleDateString(),
-        };
+    try {
+      const optimizedUrl = await optimizeImageFile(file);
+      const newArt: SavedArtItem = {
+        id: Date.now().toString() + Math.random().toString(36).slice(2, 6),
+        url: optimizedUrl,
+        label: `${activeCity} — ${file.name.replace(/\.[^/.]+$/, "")}`,
+        date: new Date().toLocaleDateString(),
+        city: activeCity,
+        timestamp: Date.now(),
+      };
 
-        const updated = [newArt, ...savedArts.slice(0, 14)];
-        setSavedArts(updated);
-        try {
-          localStorage.setItem(STORAGE_SAVED_KEY, JSON.stringify(updated));
-          localStorage.setItem(`weather:custom-bg:${activeCity.toLowerCase().trim()}`, result);
-        } catch {}
+      await saveArtworkToDB(newArt);
+      setSavedArts((prev) => [newArt, ...prev]);
 
-        props.onSelectBackground?.(result);
-        props.onSelectBg?.(result);
-        setActiveTab("saved");
-      }
-    };
-    reader.readAsDataURL(file);
-    e.target.value = "";
+      try {
+        localStorage.setItem(`weather:custom-bg:${activeCity.toLowerCase().trim()}`, optimizedUrl);
+      } catch {}
+
+      props.onSelectBackground?.(optimizedUrl);
+      props.onSelectBg?.(optimizedUrl);
+      setActiveTab("saved");
+    } catch (err) {
+      console.error("Failed to process uploaded photo:", err);
+      setErrorMessage("Could not process this image file. Please try another image.");
+    } finally {
+      e.target.value = "";
+    }
   };
 
   const handleGenerate = async (e: React.FormEvent) => {
@@ -222,16 +378,18 @@ export function AiGalleryModal(props: AiGalleryModalProps) {
       }
 
       const newArt: SavedArtItem = {
-        id: Date.now().toString(),
+        id: Date.now().toString() + Math.random().toString(36).slice(2, 6),
         url: res.imageUrl,
         label: `${activeCity} — ${prompt.trim()}`,
         date: new Date().toLocaleDateString(),
+        city: activeCity,
+        timestamp: Date.now(),
       };
 
-      const updated = [newArt, ...savedArts.filter((item) => item.url !== res.imageUrl).slice(0, 19)];
-      setSavedArts(updated);
+      await saveArtworkToDB(newArt);
+      setSavedArts((prev) => [newArt, ...prev.filter((item) => item.url !== res.imageUrl)]);
+
       try {
-        localStorage.setItem(STORAGE_SAVED_KEY, JSON.stringify(updated));
         localStorage.setItem(`weather:custom-bg:${activeCity.toLowerCase().trim()}`, res.imageUrl);
       } catch {}
 
@@ -366,7 +524,7 @@ export function AiGalleryModal(props: AiGalleryModalProps) {
                         <button
                           type="button"
                           onClick={(e) => handleSaveToCollection(art.url, art.title, e)}
-                          title={isAlreadySaved ? "Saved" : "Save to my collection"}
+                          title={isAlreadySaved ? "Saved in Gallery" : "Save to my collection"}
                           className={`absolute top-2 right-2 p-1 rounded-full text-xs transition backdrop-blur-md cursor-pointer ${
                             isAlreadySaved
                               ? "bg-amber-500/80 text-white"
@@ -387,8 +545,8 @@ export function AiGalleryModal(props: AiGalleryModalProps) {
           {activeTab === "saved" && (
             <div>
               <div className="flex items-center justify-between mb-3">
-                <span className="text-xs text-muted-foreground">
-                  {savedArts.length} saved creations
+                <span className="text-xs text-muted-foreground font-medium">
+                  {savedArts.length} saved creations (IndexedDB)
                 </span>
                 <div className="flex items-center gap-2">
                   <button
@@ -421,7 +579,7 @@ export function AiGalleryModal(props: AiGalleryModalProps) {
                 <div className="text-center py-12 text-muted-foreground text-xs space-y-2">
                   <p>No saved artworks yet.</p>
                   <p className="text-[11px]">
-                    Bookmark scenes from the Curated tab, create new ones with AI, or upload your own photo!
+                    Bookmark scenes with ★ from the Curated tab, create new ones with AI, or upload your own photos!
                   </p>
                 </div>
               ) : (
@@ -501,11 +659,11 @@ export function AiGalleryModal(props: AiGalleryModalProps) {
                 </span>
                 <div className="flex flex-wrap gap-1.5">
                   {[
-                    `Khao Ngu limestone peaks across the emerald lake`,
-                    `Damnoen Saduak wooden canal boats in morning mist`,
+                    `Khao Ngu limestone peaks across emerald water`,
+                    `Damnoen Saduak floating market morning mist`,
                     `Golden temple stupa reflection in river at sunset`,
                     `Tropical bay with longtail boats and limestone cliffs`,
-                    `Ancient Khmer temple tower at golden hour`,
+                    `Ancient temple ruins at golden hour watercolor`,
                   ].map((sug, i) => (
                     <button
                       key={i}
@@ -552,3 +710,5 @@ export function AiGalleryModal(props: AiGalleryModalProps) {
     </div>
   );
 }
+
+export default AiGalleryModal;
