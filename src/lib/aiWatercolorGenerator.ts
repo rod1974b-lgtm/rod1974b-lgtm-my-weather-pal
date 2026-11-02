@@ -176,7 +176,14 @@ export const LANDMARK_TITLES: Record<string, string> = {
 // ============================================================================
 // 2. WEATHER CONDITION ARTWORKS
 // ============================================================================
-export const WEATHER_WATERCOLORS = {...} as Record<string, string[]>;
+export const WEATHER_WATERCOLORS: {
+  thunderstorm: string[];
+  rain: string[];
+  snow: string[];
+  fog: string[];
+  clear: string[];
+  clouds: string[];
+} = {
   thunderstorm: [
     "/backgrounds/vibrant/storm.jpg",
     "https://images.unsplash.com/photo-1605721911519-3dfeb3be25e7?auto=format&fit=crop&w=800&q=75",
