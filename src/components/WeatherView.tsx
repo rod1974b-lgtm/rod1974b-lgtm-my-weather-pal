@@ -29,6 +29,8 @@ interface WeatherViewProps {
   onSelectBackground?: (url: string) => void;
 }
 
+type WearCategory = "casual" | "business" | "sports";
+
 const WMO_KEY_MAP: Record<number, { key: string; fallback: string }> = {
   0: { key: "cond_clear", fallback: "Clear sky" },
   1: { key: "cond_partly_cloudy", fallback: "Partly cloudy" },
@@ -129,6 +131,166 @@ const SPEED_UNITS: Record<string, { imperial: string; metric: string }> = {
   vi: { imperial: "dặm/h", metric: "km/h" },
 };
 
+const WEAR_CATEGORIES: Record<string, { casual: string; business: string; sports: string }> = {
+  en: { casual: "Casual", business: "Business", sports: "Sports" },
+  th: { casual: "ทั่วไป", business: "ทำงาน", sports: "ออกกำลังกาย" },
+  es: { casual: "Casual", business: "Negocios", sports: "Deporte" },
+  ja: { casual: "カジュアル", business: "ビジネス", sports: "スポーツ" },
+  zh: { casual: "休闲日常", business: "商务通勤", sports: "运动健身" },
+  hi: { casual: "कैज़ुअल", business: "कार्यालय", sports: "खेलकूद" },
+  fr: { casual: "Décontracté", business: "Professionnel", sports: "Sport" },
+  de: { casual: "Freizeit", business: "Business", sports: "Sport" },
+  pt: { casual: "Casual", business: "Trabalho", sports: "Esporte" },
+  ru: { casual: "Повседневный", business: "Деловой", sports: "Спорт" },
+  ar: { casual: "يومي", business: "عمل", sports: "رياضة" },
+  ko: { casual: "캐주얼", business: "비즈니스", sports: "운동/스포츠" },
+  id: { casual: "Santai", business: "Kantor", sports: "Olahraga" },
+  vi: { casual: "Hàng ngày", business: "Công sở", sports: "Thể thao" },
+};
+
+const ACCESSORY_LABELS: Record<string, Record<string, string>> = {
+  en: {
+    umbrella: "Umbrella",
+    sunglasses: "Sunglasses",
+    sunscreen: "SPF 30+",
+    mask: "Mask (AQI)",
+    scarf: "Scarf & Gloves",
+    water: "Hydration",
+    windbreaker: "Wind Shell",
+    evening_drop: "Evening chill: drops to",
+  },
+  th: {
+    umbrella: "พกร่ม",
+    sunglasses: "แว่นกันแดด",
+    sunscreen: "ทากันแดด",
+    mask: "หน้ากากอนามัย",
+    scarf: "ผ้าพันคอ/ถุงมือ",
+    water: "จิบน้ำบ่อยๆ",
+    windbreaker: "เสื้อกันลม",
+    evening_drop: "ค่ำนี้อากาศเย็นลงเหลือ",
+  },
+  es: {
+    umbrella: "Paraguas",
+    sunglasses: "Gafas de sol",
+    sunscreen: "Protector solar",
+    mask: "Mascarilla",
+    scarf: "Bufanda y guantes",
+    water: "Agua extra",
+    windbreaker: "Cortavientos",
+    evening_drop: "Enfriamiento nocturno: baja a",
+  },
+  ja: {
+    umbrella: "雨傘",
+    sunglasses: "サングラス",
+    sunscreen: "日焼け止め",
+    mask: "マスク着用",
+    scarf: "手袋・マフラー",
+    water: "水分補給",
+    windbreaker: "防風ウェア",
+    evening_drop: "夜間の冷え込み:",
+  },
+  zh: {
+    umbrella: "带雨伞",
+    sunglasses: "佩戴墨镜",
+    sunscreen: "涂抹防晒",
+    mask: "防尘口罩",
+    scarf: "围巾手套",
+    water: "多补充水分",
+    windbreaker: "防风外套",
+    evening_drop: "傍晚降温至",
+  },
+  fr: {
+    umbrella: "Parapluie",
+    sunglasses: "Lunettes de soleil",
+    sunscreen: "Crème solaire",
+    mask: "Masque",
+    scarf: "Écharpe et gants",
+    water: "Hydratation",
+    windbreaker: "Coupe-vent",
+    evening_drop: "Baisse nocturne : descend à",
+  },
+  de: {
+    umbrella: "Regenschirm",
+    sunglasses: "Sonnenbrille",
+    sunscreen: "Sonnencreme",
+    mask: "Schutzmaske",
+    scarf: "Schal & Handschuhe",
+    water: "Viel trinken",
+    windbreaker: "Windjacke",
+    evening_drop: "Abendkühle: sinkt auf",
+  },
+  pt: {
+    umbrella: "Guarda-chuva",
+    sunglasses: "Óculos escuros",
+    sunscreen: "Protetor solar",
+    mask: "Máscara",
+    scarf: "Cachecol e luvas",
+    water: "Hidratação",
+    windbreaker: "Corta-vento",
+    evening_drop: "Queda à noite: desce para",
+  },
+  ru: {
+    umbrella: "Зонт",
+    sunglasses: "Солнцезащитные очки",
+    sunscreen: "Защита от солнца",
+    mask: "Маска",
+    scarf: "Шарф и перчатки",
+    water: "Больше воды",
+    windbreaker: "Ветровка",
+    evening_drop: "Вечернее похолодание: до",
+  },
+  ar: {
+    umbrella: "مظلة",
+    sunglasses: "نظارة شمسية",
+    sunscreen: "واقي شمس",
+    mask: "كمامة",
+    scarf: "وشاح وقفازات",
+    water: "شرب الماء",
+    windbreaker: "سترة واقية",
+    evening_drop: "انخفاض مسائي: يصل إلى",
+  },
+  ko: {
+    umbrella: "우산 챙기기",
+    sunglasses: "선글라스",
+    sunscreen: "자외선 차단제",
+    mask: "마스크 권장",
+    scarf: "목도리와 장갑",
+    water: "수분 보충",
+    windbreaker: "바람막이",
+    evening_drop: "저녁 기온 하강:",
+  },
+  id: {
+    umbrella: "Bawa Payung",
+    sunglasses: "Kacamata Hitam",
+    sunscreen: "Tabir Surya",
+    mask: "Masker",
+    scarf: "Syal & Sarung Tangan",
+    water: "Banyak Minum",
+    windbreaker: "Jaket Angin",
+    evening_drop: "Malam mendingin hingga",
+  },
+  vi: {
+    umbrella: "Mang theo ô",
+    sunglasses: "Kính râm",
+    sunscreen: "Kem chống nắng",
+    mask: "Khẩu trang",
+    scarf: "Khăn & găng tay",
+    water: "Bổ sung nước",
+    windbreaker: "Áo gió",
+    evening_drop: "Tối se lạnh giảm còn",
+  },
+  hi: {
+    umbrella: "छाता रखें",
+    sunglasses: "धूप का चश्मा",
+    sunscreen: "सनस्क्रीन",
+    mask: "मास्क",
+    scarf: "मफलर और दस्ताने",
+    water: "पानी पिएं",
+    windbreaker: "विंडचीटर",
+    evening_drop: "शाम को तापमान गिरेगा:",
+  },
+};
+
 const TAG_TRANSLATION_MAP: Record<string, string> = {
   "TMD Alert": "alert_thunderstorm_tag",
   "TMD Warning": "alert_thunderstorm_tag",
@@ -159,6 +321,24 @@ export const WeatherView: React.FC<WeatherViewProps> = ({
   const [heroBgUrl, setHeroBgUrl] = useState<string>("");
   const [artIndex, setArtIndex] = useState(0);
   const [isDarkArtwork, setIsDarkArtwork] = useState<boolean>(false);
+
+  // Clothing category selection with persistence
+  const [wearCategory, setWearCategory] = useState<WearCategory>(() => {
+    try {
+      const saved = localStorage.getItem("weather:wear-category") as WearCategory;
+      if (saved === "business" || saved === "sports" || saved === "casual") {
+        return saved;
+      }
+    } catch {}
+    return "casual";
+  });
+
+  const handleSelectCategory = (cat: WearCategory) => {
+    setWearCategory(cat);
+    try {
+      localStorage.setItem("weather:wear-category", cat);
+    } catch {}
+  };
 
   const cityStorageKey = w?.place?.name
     ? `weather:custom-bg:${w.place.name.toLowerCase().trim()}`
@@ -197,10 +377,8 @@ export const WeatherView: React.FC<WeatherViewProps> = ({
           count++;
         }
         const avgLum = totalLum / count;
-        // Below 135 luminance means dark background -> switch City & Temp text to white
         setIsDarkArtwork(avgLum < 135);
       } catch {
-        // If CORS restricts canvas pixel reading, fall back to day/night condition
         setIsDarkArtwork(!w?.current?.is_day);
       }
     };
@@ -297,27 +475,117 @@ export const WeatherView: React.FC<WeatherViewProps> = ({
   const aqiCategoryStr = getAqiLabel(aqiVal, t);
 
   const alertsToDisplay = activeAlerts.length > 0 ? activeAlerts : disasters;
-
   const dayLabel = (w.current.is_day ? DAY_LABELS[lang] : NIGHT_LABELS[lang]) || (w.current.is_day ? "Day" : "Night");
 
-  const getClothingAdviceText = () => {
-    const code = w.current.code;
-    const tempC = unit === "imperial" ? ((w.current.temp - 32) * 5) / 9 : w.current.temp;
+  const catLabels = WEAR_CATEGORIES[lang] || WEAR_CATEGORIES.en;
+  const accLabels = ACCESSORY_LABELS[lang] || ACCESSORY_LABELS.en;
 
-    if (code >= 95 || (code >= 51 && code <= 67) || (code >= 80 && code <= 82)) {
-      return t("wear_umbrella", "Carry a sturdy umbrella or waterproof shell.");
+  // Temperature normalized in Celsius for advice logic
+  const tempC = unit === "imperial" ? ((w.current.temp - 32) * 5) / 9 : w.current.temp;
+  const code = w.current.code;
+  const isRaining = code >= 95 || (code >= 51 && code <= 67) || (code >= 80 && code <= 82);
+  const isSnowing = (code >= 71 && code <= 77) || (code >= 85 && code <= 86);
+  const windKmh = unit === "imperial" ? w.current.wind * 1.60934 : w.current.wind;
+
+  // Category-specific clothing advice generator
+  const getExpandedClothingAdvice = (): string => {
+    if (wearCategory === "business") {
+      if (isRaining) {
+        return lang === "th"
+          ? "เสื้อเทรนช์โค้ทกันน้ำ รองเท้าหนังกันน้ำ และพกร่มทำงานคันใหญ่"
+          : "Tailored commuter trench coat, water-resistant dress shoes, and a sturdy business umbrella.";
+      }
+      if (isSnowing || tempC <= 5) {
+        return lang === "th"
+          ? "เสื้อโค้ทผ้าวูลตัวยาวทับชุดสูท ผ้าพันคอแคชเมียร์ และถุงมือหนังสุภาพ"
+          : "Tailored wool overcoat over suit, cashmere scarf, and insulated dress leather gloves.";
+      }
+      if (tempC <= 14) {
+        return lang === "th"
+          ? "เบลเซอร์ผ้าวูล เสื้อเชิ้ตคัตติ้งเนี้ยบ หรือสเวตเตอร์บางสวมทับเชิ้ต"
+          : "Structured wool blazer, crisp dress shirt, and optional fine-knit sweater layer.";
+      }
+      if (tempC <= 22) {
+        return lang === "th"
+          ? "สูทหรือเบลเซอร์เนื้อเบา เสื้อเชิ้ตระบายอากาศดี และกางเกงสแล็คทรงสวย"
+          : "Lightweight tailored blazer, breathable poplin dress shirt, and classic chinos or trousers.";
+      }
+      return lang === "th"
+        ? "กางเกงผ้าลินินผสมหรือผ้าวูลเนื้อบาง เสื้อเชิ้ตแขนสั้นทรงสุภาพ และรองเท้าโลฟเฟอร์"
+        : "Breathable linen-blend trousers, lightweight short-sleeve dress shirt, and comfortable loafers.";
     }
-    if (tempC <= 5 || (code >= 71 && code <= 77)) {
-      return t("wear_heavy_coat", "Heavy thermal coat, insulated scarf, and gloves recommended.");
+
+    if (wearCategory === "sports") {
+      if (isRaining) {
+        return lang === "th"
+          ? "เสื้อวิ่งกันน้ำแบบมีฮู้ด หมวกแก๊ปกันฝนเข้าตา และรองเท้าวิ่งยึดเกาะพิเศษ"
+          : "Water-repellent running shell, brimmed cap to shield eyes, and high-traction athletic shoes.";
+      }
+      if (isSnowing || tempC <= 5) {
+        return lang === "th"
+          ? "ชุดรัดกล้ามเนื้อเก็บความอบอุ่น กางเกงวิ่งกันลม ถุงมือวิ่ง และที่คาดหู"
+          : "Thermal compression base layer, windproof running tights, light sports gloves, and ear warmer.";
+      }
+      if (tempC <= 14) {
+        return lang === "th"
+          ? "เสื้อออกกำลังกายแขนยาวผ้าระบายเหงื่อ กางเกงแทร็คแพนต์ และเสื้อกั๊กกันลม"
+          : "Long-sleeve technical athletic shirt, breathable training tights, and lightweight packable wind shell.";
+      }
+      if (tempC <= 22) {
+        return lang === "th"
+          ? "เสื้อยืดกีฬาเนื้อดรายฟิต กางเกงขาสั้นวิ่ง ถุงเท้ากีฬา และรองเท้าวิ่งคู่ใจ"
+          : "Moisture-wicking technical tee, lightweight running shorts, and cushioned trainers.";
+      }
+      return lang === "th"
+        ? "เสื้อกล้ามวิ่งตาข่ายระบายอากาศ กางเกงขาสั้นวิ่งกันเสียดสี แถบซับเหงื่อ และพกน้ำดื่ม"
+        : "Ultra-breathable mesh singlet, anti-chafing running shorts, sweatband, and electrolyte hydration.";
+    }
+
+    // Default: Casual
+    if (isRaining) {
+      return t("wear_umbrella", "Carry a sturdy umbrella or waterproof shell and water-resistant sneakers.");
+    }
+    if (isSnowing || tempC <= 5) {
+      return t("wear_heavy_coat", "Heavy thermal coat, insulated scarf, beanie, and winter boots recommended.");
     }
     if (tempC <= 14) {
-      return t("wear_jacket", "A warm jacket, cozy knitwear, or windbreaker is ideal.");
+      return t("wear_jacket", "A warm jacket, cozy knitwear, or windbreaker layered over casual denim.");
     }
     if (tempC <= 21) {
-      return t("wear_mild", "Comfortable layers, long sleeves, or a casual light cardigan.");
+      return t("wear_mild", "Comfortable layers, long sleeves, or a casual light cardigan with chinos or jeans.");
     }
-    return t("wear_light", "Lightweight breathable fabrics, sunglasses, and sun protection.");
+    return t("wear_light", "Lightweight breathable fabrics, cotton tee, sunglasses, and sun protection.");
   };
+
+  // Smart accessory badges calculation
+  const accessories: { icon: string; label: string }[] = [];
+  if (isRaining || (w.hourly?.[0]?.precipProb !== undefined && w.hourly[0].precipProb >= 30)) {
+    accessories.push({ icon: "☂️", label: accLabels.umbrella });
+  }
+  if (w.current.is_day && uvVal >= 3) {
+    accessories.push({ icon: "🕶️", label: accLabels.sunglasses });
+  }
+  if (w.current.is_day && uvVal >= 6) {
+    accessories.push({ icon: "🧴", label: accLabels.sunscreen });
+  }
+  if (aqiVal !== undefined && aqiVal > 100) {
+    accessories.push({ icon: "😷", label: accLabels.mask });
+  }
+  if (tempC <= 8) {
+    accessories.push({ icon: "🧣", label: accLabels.scarf });
+  }
+  if (tempC >= 29) {
+    accessories.push({ icon: "💧", label: accLabels.water });
+  }
+  if (windKmh >= 24 && !accessories.some((a) => a.icon === "☂️")) {
+    accessories.push({ icon: "💨", label: accLabels.windbreaker });
+  }
+
+  // Evening drop calculation from daily max/min
+  const todayForecast = w.daily?.[0];
+  const hasEveningDrop =
+    todayForecast &&
+    todayForecast.max - todayForecast.min >= (unit === "imperial" ? 14 : 7);
 
   const handleNextArtwork = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -498,19 +766,83 @@ export const WeatherView: React.FC<WeatherViewProps> = ({
         </div>
       </section>
 
-      {/* 3. WHAT TO WEAR RECOMMENDATION */}
-      <section className="p-4 rounded-2xl bg-card border border-border/70 shadow-xs text-card-foreground">
-        <div className="flex items-start gap-3">
-          <span className="text-2xl mt-0.5">👕</span>
-          <div>
+      {/* 3. WHAT TO WEAR RECOMMENDATION (Expanded with Occasion & Accessories) */}
+      <section className="p-4 rounded-2xl bg-card border border-border/70 shadow-xs text-card-foreground space-y-3">
+        <div className="flex items-center justify-between gap-2 flex-wrap">
+          <div className="flex items-center gap-2">
+            <span className="text-xl">👕</span>
             <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
               {t("what_to_wear", "What to Wear Today")}
             </h3>
-            <p className="text-sm font-medium mt-1 leading-snug">
-              {getClothingAdviceText()}
-            </p>
+          </div>
+
+          {/* Interactive Occasion Pills */}
+          <div className="inline-flex items-center rounded-xl bg-muted/60 p-0.5 border border-border/50 text-xs">
+            <button
+              type="button"
+              onClick={() => handleSelectCategory("casual")}
+              className={`px-2.5 py-1 rounded-lg font-medium transition cursor-pointer ${
+                wearCategory === "casual"
+                  ? "bg-background text-foreground shadow-xs font-semibold"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              {catLabels.casual}
+            </button>
+            <button
+              type="button"
+              onClick={() => handleSelectCategory("business")}
+              className={`px-2.5 py-1 rounded-lg font-medium transition cursor-pointer ${
+                wearCategory === "business"
+                  ? "bg-background text-foreground shadow-xs font-semibold"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              {catLabels.business}
+            </button>
+            <button
+              type="button"
+              onClick={() => handleSelectCategory("sports")}
+              className={`px-2.5 py-1 rounded-lg font-medium transition cursor-pointer ${
+                wearCategory === "sports"
+                  ? "bg-background text-foreground shadow-xs font-semibold"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              {catLabels.sports}
+            </button>
           </div>
         </div>
+
+        {/* Dynamic Advice Text */}
+        <p className="text-sm font-medium leading-snug text-foreground/90 pt-0.5">
+          {getExpandedClothingAdvice()}
+        </p>
+
+        {/* Smart Accessories Badges Row */}
+        {accessories.length > 0 && (
+          <div className="flex flex-wrap items-center gap-1.5 pt-1 border-t border-border/40">
+            {accessories.map((acc, idx) => (
+              <span
+                key={idx}
+                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-muted/50 border border-border/50 text-[11px] font-medium text-foreground/80"
+              >
+                <span>{acc.icon}</span>
+                <span>{acc.label}</span>
+              </span>
+            ))}
+          </div>
+        )}
+
+        {/* Evening Temperature Swing Warning */}
+        {hasEveningDrop && todayForecast && (
+          <div className="flex items-center gap-1.5 text-[11px] font-medium text-amber-800 dark:text-amber-300 bg-amber-500/10 px-2.5 py-1 rounded-lg border border-amber-500/20">
+            <span>🌙</span>
+            <span>
+              {accLabels.evening_drop} {Math.round(todayForecast.min)}{tempUnitStr}
+            </span>
+          </div>
+        )}
       </section>
 
       {/* 4. HOURLY FORECAST (24 Hours Rolling from Now) */}
