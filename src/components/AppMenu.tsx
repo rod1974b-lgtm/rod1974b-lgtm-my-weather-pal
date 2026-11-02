@@ -1,194 +1,147 @@
-// src/components/AppMenu.tsx
-import { useState, useEffect, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Link } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
+import { LANGUAGES } from "./LanguageSelector";
 import type { WeatherUnit } from "@/lib/weather";
-import { saveUnitPref } from "@/lib/weather";
 
-const SKY_PREF_KEY = "weather:sky-pref";
-const FONT_SIZE_KEY = "weather:font-size-pref";
-
-const SKY_OPTIONS = [
-  { value: "auto", labelKey: "sky_auto" },
-  { value: "clear-day", labelKey: "sky_clear_day" },
-  { value: "clear-night", labelKey: "sky_clear_night" },
-  { value: "cloudy-day", labelKey: "sky_cloudy_day" },
-  { value: "cloudy-night", labelKey: "sky_cloudy_night" },
-  { value: "fog", labelKey: "sky_fog" },
-  { value: "rain", labelKey: "sky_rain" },
-  { value: "snow", labelKey: "sky_snow" },
-  { value: "storm", labelKey: "sky_storm" },
-];
-
-const FONT_SIZE_OPTIONS = [
-  { value: "normal", labelKey: "font_normal", scale: "100%" },
-  { value: "large", labelKey: "font_large", scale: "115%" },
-  { value: "xlarge", labelKey: "font_xlarge", scale: "130%" },
-];
-
-const LANGUAGES = [
-  { code: "en", label: "English", flag: "🇺🇸" },
-  { code: "th", label: "ไทย", flag: "🇹🇭" },
-  { code: "es", label: "Español", flag: "🇪🇸" },
-  { code: "ja", label: "日本語", flag: "🇯🇵" },
-  { code: "zh", label: "中文", flag: "🇨🇳" },
-  { code: "hi", label: "हिन्दी", flag: "🇮🇳" },
-  { code: "fr", label: "Français", flag: "🇫🇷" },
-  { code: "de", label: "Deutsch", flag: "🇩🇪" },
-  { code: "pt", label: "Português", flag: "🇧🇷" },
-  { code: "ru", label: "Русский", flag: "🇷🇺" },
-  { code: "ar", label: "العربية", flag: "🇸🇦" },
-  { code: "ko", label: "한국어", flag: "🇰🇷" },
-  { code: "id", label: "Bahasa Indonesia", flag: "🇮🇩" },
-  { code: "vi", label: "Tiếng Việt", flag: "🇻🇳" },
-];
-
-export function AppMenu({
-  unit,
-  onUnitChange,
-}: {
+interface AppMenuProps {
   unit: WeatherUnit;
-  onUnitChange: (next: WeatherUnit) => void;
-}) {
+  onUnitChange: (unit: WeatherUnit) => void;
+}
+
+const SKY_PREFS = [
+  { value: "auto", label: "Auto (weather)" },
+  { value: "day", label: "Clear Day" },
+  { value: "night", label: "Clear Night" },
+  { value: "cloudy", label: "Overcast / Cloudy" },
+  { value: "rain", label: "Rain / Storm" },
+  { value: "sunset", label: "Sunset Glow" },
+];
+
+const FONT_SIZES = [
+  { value: "100%", label: "Normal (100%)" },
+  { value: "115%", label: "Large (115%)" },
+  { value: "130%", label: "Huge (130%)" },
+];
+
+export function AppMenu({ unit, onUnitChange }: AppMenuProps) {
   const { t, i18n } = useTranslation();
   const [open, setOpen] = useState(false);
   const [skyPref, setSkyPref] = useState("auto");
-  const [fontSize, setFontSize] = useState("normal");
-  const [currentLang, setCurrentLang] = useState(() => i18n?.language || "en");
+  const [fontSize, setFontSize] = useState("100%");
   const menuRef = useRef<HTMLDivElement>(null);
 
-  // Sync saved preferences on mount and apply font size to root
+  // Restore saved preferences
   useEffect(() => {
     try {
-      const savedSky = localStorage.getItem(SKY_PREF_KEY);
-      if (savedSky) setSkyPref(savedSky);
+      const storedSky = localStorage.getItem("weather:sky-pref") || "auto";
+      setSkyPref(storedSky);
 
-      const savedFont = localStorage.getItem(FONT_SIZE_KEY);
-      if (savedFont) {
-        setFontSize(savedFont);
-        const opt = FONT_SIZE_OPTIONS.find((f) => f.value === savedFont);
-        if (opt) document.documentElement.style.fontSize = opt.scale;
-      }
-
-      if (i18n?.language) {
-        setCurrentLang(i18n.language);
-      }
+      const storedFont = localStorage.getItem("weather:font-size") || "100%";
+      setFontSize(storedFont);
+      document.documentElement.style.fontSize = storedFont;
     } catch {}
-  }, [i18n?.language]);
-
-  // Keep language in sync if switched via LanguageSelector
-  useEffect(() => {
-    const handleSync = (e: Event) => {
-      const detail = (e as CustomEvent).detail;
-      if (detail) setCurrentLang(detail);
-    };
-    window.addEventListener("weather:lang-change", handleSync);
-    return () => window.removeEventListener("weather:lang-change", handleSync);
   }, []);
 
-  const handleSkyChange = (val: string) => {
-    setSkyPref(val);
-    try {
-      if (val === "auto") {
-        localStorage.removeItem(SKY_PREF_KEY);
-      } else {
-        localStorage.setItem(SKY_PREF_KEY, val);
-      }
-      window.dispatchEvent(new CustomEvent("weather:sky-change", { detail: val }));
-    } catch {}
-  };
-
-  const handleFontSizeChange = (val: string) => {
-    setFontSize(val);
-    try {
-      localStorage.setItem(FONT_SIZE_KEY, val);
-      const opt = FONT_SIZE_OPTIONS.find((f) => f.value === val);
-      if (opt) {
-        document.documentElement.style.fontSize = opt.scale;
-      }
-    } catch {}
-  };
-
-  const handleLangChange = async (code: string) => {
-    try {
-      setCurrentLang(code);
-      if (typeof i18n?.changeLanguage === "function") {
-        await i18n.changeLanguage(code);
-      }
-      localStorage.setItem("weather:lang", code);
-      localStorage.setItem("app_language", code);
-      if (typeof document !== "undefined") {
-        document.documentElement.lang = code;
-      }
-      window.dispatchEvent(new CustomEvent("weather:lang-change", { detail: code }));
-    } catch (e) {
-      console.error("Language switch error:", e);
-    }
-  };
-
-  // Close when tapping outside on desktop
+  // Close on outside click
   useEffect(() => {
-    const handleOutsideClick = (e: MouseEvent) => {
+    if (!open) return;
+    const handleClick = (e: MouseEvent | TouchEvent) => {
       if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
         setOpen(false);
       }
     };
-    if (open) {
-      document.addEventListener("mousedown", handleOutsideClick);
-    }
-    return () => document.removeEventListener("mousedown", handleOutsideClick);
+    document.addEventListener("mousedown", handleClick);
+    document.addEventListener("touchstart", handleClick);
+    return () => {
+      document.removeEventListener("mousedown", handleClick);
+      document.removeEventListener("touchstart", handleClick);
+    };
   }, [open]);
 
+  const handleSkyChange = (val: string) => {
+    setSkyPref(val);
+    try {
+      localStorage.setItem("weather:sky-pref", val);
+      window.dispatchEvent(
+        new CustomEvent("weather:sky-change", { detail: { sky: val } })
+      );
+    } catch {}
+  };
+
+  const handleFontChange = (val: string) => {
+    setFontSize(val);
+    try {
+      localStorage.setItem("weather:font-size", val);
+      document.documentElement.style.fontSize = val;
+    } catch {}
+  };
+
+  const handleLanguageSelect = (code: string) => {
+    i18n.changeLanguage(code);
+    try {
+      localStorage.setItem("weather:lang", code);
+      localStorage.setItem("i18nextLng", code);
+      document.documentElement.lang = code;
+      window.dispatchEvent(
+        new CustomEvent("weather:lang-change", { detail: { lang: code } })
+      );
+    } catch {}
+  };
+
+  const currentLangCode = i18n?.language?.toLowerCase().split("-")[0] || "en";
+
   return (
-    <div className="relative inline-block text-left" ref={menuRef}>
+    <div className="relative" ref={menuRef}>
       <button
-        onClick={() => setOpen(!open)}
-        className="flex items-center justify-center w-10 h-10 rounded-full bg-white/20 hover:bg-white/30 backdrop-blur-md border border-white/30 shadow-md text-foreground transition-all duration-200 cursor-pointer"
-        aria-label={t("settings", "Settings")}
+        type="button"
+        onClick={() => setOpen((prev) => !prev)}
+        aria-label="Settings"
+        className="flex h-9 w-9 items-center justify-center rounded-full border border-border bg-card text-foreground shadow-xs hover:bg-muted transition cursor-pointer"
       >
-        <span className="text-xl">⚙️</span>
+        <span className="text-base select-none">⚙️</span>
       </button>
 
-      {/* Mobile Backdrop to prevent gesture/touch event traps */}
       {open && (
-        <div
-          className="fixed inset-0 z-40 bg-black/40 backdrop-blur-xs sm:hidden"
-          onClick={() => setOpen(false)}
-        />
-      )}
+        <div className="absolute right-0 top-11 z-50 w-[320px] max-w-[calc(100vw-1.5rem)] rounded-2xl border border-border bg-card/95 p-4 shadow-xl backdrop-blur-md space-y-4 max-h-[85vh] overflow-y-auto">
+          {/* Header */}
+          <div className="flex items-center justify-between border-b border-border pb-2.5">
+            <span className="text-sm font-bold text-foreground">
+              {t("settings", "Settings")}
+            </span>
+            <button
+              type="button"
+              onClick={() => setOpen(false)}
+              className="text-muted-foreground hover:text-foreground text-sm cursor-pointer"
+            >
+              ✕
+            </button>
+          </div>
 
-      {open && (
-        <div className="fixed sm:absolute right-4 sm:right-0 top-16 sm:top-12 w-[calc(100vw-32px)] sm:w-84 max-h-[85vh] overflow-y-auto z-50 rounded-2xl bg-card/95 backdrop-blur-xl border border-border shadow-2xl p-4 text-card-foreground">
-          {/* Temperature Units */}
-          <div className="mb-4">
-            <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">
+          {/* Units */}
+          <div>
+            <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block mb-1.5">
               {t("units", "Units")}
-            </h4>
-            <div className="grid grid-cols-2 gap-2">
+            </label>
+            <div className="grid grid-cols-2 gap-1.5">
               <button
                 type="button"
-                onClick={() => {
-                  onUnitChange("metric");
-                  saveUnitPref("metric");
-                }}
-                className={`py-2 px-3 rounded-lg text-xs font-medium border text-center transition cursor-pointer ${
+                onClick={() => onUnitChange("metric")}
+                className={`py-1.5 text-xs font-medium rounded-lg transition cursor-pointer ${
                   unit === "metric"
-                    ? "bg-primary text-primary-foreground border-primary shadow-xs"
-                    : "bg-muted hover:bg-muted/80 text-foreground border-border"
+                    ? "bg-primary text-primary-foreground font-semibold shadow-xs"
+                    : "bg-muted hover:bg-muted/80 text-foreground"
                 }`}
               >
                 °C • Metric
               </button>
               <button
                 type="button"
-                onClick={() => {
-                  onUnitChange("imperial");
-                  saveUnitPref("imperial");
-                }}
-                className={`py-2 px-3 rounded-lg text-xs font-medium border text-center transition cursor-pointer ${
+                onClick={() => onUnitChange("imperial")}
+                className={`py-1.5 text-xs font-medium rounded-lg transition cursor-pointer ${
                   unit === "imperial"
-                    ? "bg-primary text-primary-foreground border-primary shadow-xs"
-                    : "bg-muted hover:bg-muted/80 text-foreground border-border"
+                    ? "bg-primary text-primary-foreground font-semibold shadow-xs"
+                    : "bg-muted hover:bg-muted/80 text-foreground"
                 }`}
               >
                 °F • US
@@ -196,66 +149,63 @@ export function AppMenu({
             </div>
           </div>
 
-          {/* Sky Theme Background */}
-          <div className="mb-4">
-            <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">
-              {t("sky_background", "Sky background")}
-            </h4>
+          {/* Sky background */}
+          <div>
+            <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block mb-1.5">
+              {t("sky_background", "Sky Background")}
+            </label>
             <select
               value={skyPref}
               onChange={(e) => handleSkyChange(e.target.value)}
-              className="w-full bg-muted border border-border rounded-lg py-2 px-3 text-xs text-foreground focus:outline-hidden focus:ring-2 focus:ring-primary cursor-pointer"
+              className="w-full rounded-lg border border-border bg-muted px-3 py-1.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer"
             >
-              {SKY_OPTIONS.map((opt) => (
-                <option key={opt.value} value={opt.value}>
-                  {t(opt.labelKey)}
+              {SKY_PREFS.map((s) => (
+                <option key={s.value} value={s.value} className="bg-card text-foreground">
+                  {s.label}
                 </option>
               ))}
             </select>
           </div>
 
-          {/* Text Size */}
-          <div className="mb-4">
-            <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">
-              {t("text_size", "Text size")}
-            </h4>
+          {/* Text size */}
+          <div>
+            <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block mb-1.5">
+              {t("text_size", "Text Size")}
+            </label>
             <div className="grid grid-cols-3 gap-1.5">
-              {FONT_SIZE_OPTIONS.map((f) => (
+              {FONT_SIZES.map((f) => (
                 <button
                   key={f.value}
                   type="button"
-                  onClick={() => handleFontSizeChange(f.value)}
-                  className={`py-1.5 px-2 rounded-lg text-xs font-medium border text-center transition cursor-pointer ${
+                  onClick={() => handleFontChange(f.value)}
+                  className={`py-1.5 px-1 text-xs font-medium rounded-lg transition text-center truncate cursor-pointer ${
                     fontSize === f.value
-                      ? "bg-primary text-primary-foreground border-primary shadow-xs"
-                      : "bg-muted hover:bg-muted/80 text-foreground border-border"
+                      ? "bg-primary text-primary-foreground font-semibold shadow-xs"
+                      : "bg-muted hover:bg-muted/80 text-foreground"
                   }`}
                 >
-                  {t(f.labelKey)}
+                  {f.label}
                 </button>
               ))}
             </div>
           </div>
 
-          {/* Language Selector */}
-          <div className="mb-4">
-            <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">
+          {/* Languages */}
+          <div>
+            <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block mb-1.5">
               {t("language", "Language")}
-            </h4>
-            <div className="grid grid-cols-2 gap-1.5 max-h-48 overflow-y-auto pr-1">
+            </label>
+            <div className="grid grid-cols-2 gap-1.5 max-h-40 overflow-y-auto pr-1">
               {LANGUAGES.map((lang) => {
                 const isActive =
-                  currentLang === lang.code ||
-                  currentLang.startsWith(lang.code + "-") ||
-                  i18n?.language === lang.code ||
-                  i18n?.language?.startsWith(lang.code + "-");
-
+                  currentLangCode === lang.code ||
+                  (lang.code === "en" && currentLangCode.startsWith("en"));
                 return (
                   <button
                     key={lang.code}
                     type="button"
-                    onClick={() => handleLangChange(lang.code)}
-                    className={`flex items-center gap-1.5 py-1.5 px-2 rounded-lg text-xs text-left border transition cursor-pointer ${
+                    onClick={() => handleLanguageSelect(lang.code)}
+                    className={`flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs transition text-left cursor-pointer border ${
                       isActive
                         ? "bg-primary text-primary-foreground border-primary font-semibold shadow-xs"
                         : "bg-muted hover:bg-muted/80 text-foreground border-border"
@@ -272,13 +222,22 @@ export function AppMenu({
 
           {/* Footer actions */}
           <div className="border-t border-border pt-3 flex items-center justify-between text-xs text-muted-foreground">
-            <Link
-              to="/privacy"
-              onClick={() => setOpen(false)}
-              className="hover:text-foreground underline underline-offset-2"
-            >
-              {t("privacy_policy", "Privacy Policy")}
-            </Link>
+            <div className="flex items-center gap-3">
+              <Link
+                to="/gallery"
+                onClick={() => setOpen(false)}
+                className="hover:text-foreground underline underline-offset-2 font-medium"
+              >
+                🎨 {t("city_art", "City Art")}
+              </Link>
+              <Link
+                to="/privacy"
+                onClick={() => setOpen(false)}
+                className="hover:text-foreground underline underline-offset-2"
+              >
+                {t("privacy_policy", "Privacy")}
+              </Link>
+            </div>
             <button
               type="button"
               onClick={() => setOpen(false)}
@@ -292,3 +251,5 @@ export function AppMenu({
     </div>
   );
 }
+
+export default AppMenu;
