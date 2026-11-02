@@ -192,7 +192,7 @@ export interface WeatherIconProps {
   code?: number | string;
   iconCode?: string;
   wmoCode?: number;
-  isDay?: number;
+  isDay?: number | undefined;
   description?: string;
   className?: string;
   fallbackEmoji?: string;

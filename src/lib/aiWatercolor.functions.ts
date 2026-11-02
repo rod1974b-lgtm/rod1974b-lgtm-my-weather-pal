@@ -4,7 +4,7 @@ import { createServerFn } from "@tanstack/react-start";
 export interface GenerateWatercolorInput {
   city: string;
   userPrompt: string;
-  weatherDesc?: string;
+  weatherDesc?: string | undefined;
 }
 
 export interface GenerateWatercolorResult {
@@ -15,7 +15,7 @@ export interface GenerateWatercolorResult {
 export const generateWatercolorFn = createServerFn({ method: "POST" })
   .inputValidator((input: GenerateWatercolorInput) => input)
   .handler(async ({ data }): Promise<GenerateWatercolorResult> => {
-    const apiKey = process.env.LOVABLE_API_KEY;
+    const apiKey = process.env["LOVABLE_API_KEY"];
     if (!apiKey) {
       throw new Error("Missing LOVABLE_API_KEY on the server.");
     }
