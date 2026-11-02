@@ -22,7 +22,7 @@ interface AiGalleryModalProps {
   activeBg?: string | null;
   tempC?: number;
   currentTemp?: number;
-  isDay?: number;
+  isDay?: number | undefined;
   onSelectBackground?: (url: string) => void;
   onSelectBg?: (url: string) => void;
 }

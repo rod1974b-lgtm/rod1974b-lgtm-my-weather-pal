@@ -176,7 +176,14 @@ export const LANDMARK_TITLES: Record<string, string> = {
 // ============================================================================
 // 2. WEATHER CONDITION ARTWORKS
 // ============================================================================
-export const WEATHER_WATERCOLORS: Record<string, string[]> = {
+export const WEATHER_WATERCOLORS: {
+  thunderstorm: string[];
+  rain: string[];
+  snow: string[];
+  fog: string[];
+  clear: string[];
+  clouds: string[];
+} = {
   thunderstorm: [
     "/backgrounds/vibrant/storm.jpg",
     "https://images.unsplash.com/photo-1605721911519-3dfeb3be25e7?auto=format&fit=crop&w=800&q=75",
@@ -577,9 +584,10 @@ export async function getCityWeatherBackground(
   // 4. Live Wikipedia Landmark Lookup (runs if coordinates are available)
   if (lat && lon) {
     scanWikipediaLandmarks(lat, lon, city).then((wikiUrls) => {
-      if (wikiUrls.length > 0) {
-        preloadImage(wikiUrls[0], 6000).then((ok) => {
-          if (ok && onGenerated) onGenerated(wikiUrls[0]);
+      const firstWiki = wikiUrls[0];
+      if (firstWiki) {
+        preloadImage(firstWiki, 6000).then((ok) => {
+          if (ok && onGenerated) onGenerated(firstWiki);
         });
       }
     });

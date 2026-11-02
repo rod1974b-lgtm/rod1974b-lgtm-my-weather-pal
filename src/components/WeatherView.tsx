@@ -82,7 +82,8 @@ function getUvLabel(uv: number, t: (k: string, fallback: string) => string): str
   return t("uv_extreme", "Extreme");
 }
 
-function getAqiLabel(aqi: number, t: (k: string, fallback: string) => string): string {
+function getAqiLabel(aqi: number | undefined, t: (k: string, fallback: string) => string): string {
+  if (aqi === undefined) return "—";
   if (aqi <= 50) return t("aqi_good", "Good");
   if (aqi <= 100) return t("aqi_moderate", "Moderate");
   if (aqi <= 150) return t("aqi_sensitive", "Unhealthy for Sensitive Groups");
@@ -175,8 +176,9 @@ export const WeatherView: React.FC<WeatherViewProps> = ({
       w.place.lon
     );
 
-    if (arts.length > 0) {
-      setHeroBgUrl(arts[0]);
+    const firstArt = arts[0];
+    if (firstArt) {
+      setHeroBgUrl(firstArt);
       setIsAiGenerated(true);
     } else {
       getCityWeatherBackground(
