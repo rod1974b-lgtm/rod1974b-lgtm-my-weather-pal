@@ -30,6 +30,9 @@ export function AppMenu({ unit, onUnitChange, onOpenAiGallery }: AppMenuProps) {
   const [open, setOpen] = useState(false);
   const [skyPref, setSkyPref] = useState("auto");
   const [fontSize, setFontSize] = useState("100%");
+  const [currentLang, setCurrentLang] = useState(() => {
+    return i18n?.language?.toLowerCase().split("-")[0] || "en";
+  });
   const menuRef = useRef<HTMLDivElement>(null);
 
   // Restore saved preferences
@@ -41,24 +44,16 @@ export function AppMenu({ unit, onUnitChange, onOpenAiGallery }: AppMenuProps) {
       const storedFont = localStorage.getItem("weather:font-size") || "100%";
       setFontSize(storedFont);
       document.documentElement.style.fontSize = storedFont;
-    } catch {}
-  }, []);
 
-  // Close on outside click
-  useEffect(() => {
-    if (!open) return;
-    const handleClick = (e: MouseEvent | TouchEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-        setOpen(false);
+      const savedLang =
+        localStorage.getItem("weather:lang") ||
+        localStorage.getItem("app_language") ||
+        i18n?.language;
+      if (savedLang) {
+        setCurrentLang(savedLang.toLowerCase().split("-")[0]);
       }
-    };
-    document.addEventListener("mousedown", handleClick);
-    document.addEventListener("touchstart", handleClick);
-    return () => {
-      document.removeEventListener("mousedown", handleClick);
-      document.removeEventListener("touchstart", handleClick);
-    };
-  }, [open]);
+    } catch {}
+  }, [i18n?.language]);
 
   const handleSkyChange = (val: string) => {
     setSkyPref(val);
@@ -78,19 +73,29 @@ export function AppMenu({ unit, onUnitChange, onOpenAiGallery }: AppMenuProps) {
     } catch {}
   };
 
-  const handleLanguageSelect = (code: string) => {
-    i18n.changeLanguage(code);
+  const handleLanguageSelect = async (code: string) => {
+    setCurrentLang(code);
     try {
+      if (typeof i18n?.changeLanguage === "function") {
+        await i18n.changeLanguage(code);
+      }
       localStorage.setItem("weather:lang", code);
+      localStorage.setItem("app_language", code);
       localStorage.setItem("i18nextLng", code);
-      document.documentElement.lang = code;
+      if (typeof document !== "undefined") {
+        document.documentElement.lang = code;
+      }
       window.dispatchEvent(
-        new CustomEvent("weather:lang-change", { detail: { lang: code } })
+        new CustomEvent("weather:lang-change", { detail: code })
       );
-    } catch {}
+      // Brief delay so mobile users see the checkmark, then close menu to reveal translated page
+      setTimeout(() => {
+        setOpen(false);
+      }, 180);
+    } catch (err) {
+      console.error("Language switch error:", err);
+    }
   };
-
-  const currentLangCode = i18n?.language?.toLowerCase().split("-")[0] || "en";
 
   return (
     <div className="relative" ref={menuRef}>
@@ -103,6 +108,14 @@ export function AppMenu({ unit, onUnitChange, onOpenAiGallery }: AppMenuProps) {
         <span className="text-base select-none">⚙️</span>
       </button>
 
+      {/* Mobile Backdrop Overlay (safely closes menu without eating touch events) */}
+      {open && (
+        <div
+          className="fixed inset-0 z-40 bg-black/30 backdrop-blur-xs sm:bg-transparent"
+          onClick={() => setOpen(false)}
+        />
+      )}
+
       {open && (
         <div className="absolute right-0 top-11 z-50 w-[320px] max-w-[calc(100vw-1.5rem)] rounded-2xl border border-border bg-card/95 p-4 shadow-xl backdrop-blur-md space-y-4 max-h-[85vh] overflow-y-auto">
           {/* Header */}
@@ -113,7 +126,7 @@ export function AppMenu({ unit, onUnitChange, onOpenAiGallery }: AppMenuProps) {
             <button
               type="button"
               onClick={() => setOpen(false)}
-              className="text-muted-foreground hover:text-foreground text-sm cursor-pointer"
+              className="text-muted-foreground hover:text-foreground text-sm cursor-pointer p-1"
             >
               ✕
             </button>
@@ -191,30 +204,30 @@ export function AppMenu({ unit, onUnitChange, onOpenAiGallery }: AppMenuProps) {
             </div>
           </div>
 
-          {/* Languages */}
+          {/* Languages (Touch-Optimized for Mobile & PC) */}
           <div>
             <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block mb-1.5">
               {t("language", "Language")}
             </label>
-            <div className="grid grid-cols-2 gap-1.5 max-h-40 overflow-y-auto pr-1">
+            <div className="grid grid-cols-2 gap-1.5 max-h-48 overflow-y-auto pr-1">
               {LANGUAGES.map((lang) => {
                 const isActive =
-                  currentLangCode === lang.code ||
-                  (lang.code === "en" && currentLangCode.startsWith("en"));
+                  currentLang === lang.code ||
+                  (lang.code === "en" && currentLang.startsWith("en"));
                 return (
                   <button
                     key={lang.code}
                     type="button"
                     onClick={() => handleLanguageSelect(lang.code)}
-                    className={`flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs transition text-left cursor-pointer border ${
+                    className={`flex items-center gap-2 px-2.5 py-2 rounded-lg text-xs transition text-left cursor-pointer border active:scale-95 ${
                       isActive
                         ? "bg-primary text-primary-foreground border-primary font-semibold shadow-xs"
                         : "bg-muted hover:bg-muted/80 text-foreground border-border"
                     }`}
                   >
-                    <span className="text-sm">{lang.flag}</span>
+                    <span className="text-base leading-none select-none">{lang.flag}</span>
                     <span className="truncate flex-1">{lang.native}</span>
-                    {isActive && <span className="text-[10px]">✓</span>}
+                    {isActive && <span className="text-xs font-bold">✓</span>}
                   </button>
                 );
               })}
