@@ -139,7 +139,7 @@ const SPEED_UNITS: Record<string, { imperial: string; metric: string }> = {
   vi: { imperial: "dặm/h", metric: "km/h" },
 };
 
-const WEAR_CATEGORIES: Record<string, { casual: string; business: string; sports: string }> = {
+const WEAR_CATEGORIES = {
   en: { casual: "Casual", business: "Business", sports: "Sports" },
   th: { casual: "ทั่วไป", business: "ทำงาน", sports: "ออกกำลังกาย" },
   es: { casual: "Casual", business: "Negocios", sports: "Deporte" },
@@ -712,7 +712,7 @@ export const WeatherView: React.FC<WeatherViewProps> = ({
               <div className={`inline-flex items-center rounded-xl backdrop-blur-md border shadow-xs p-0.5 transition-colors duration-300 ${actionBtnGlassBg}`}>
                 <button
                   type="button"
-                  onClick={() => setGalleryOpen(true)}
+                  onClick={() => (onOpenAiGallery ? onOpenAiGallery() : setGalleryOpen(true))}
                   className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold hover:opacity-80 rounded-lg transition cursor-pointer"
                   title={t("art_gallery", "AI Gallery")}
                 >
