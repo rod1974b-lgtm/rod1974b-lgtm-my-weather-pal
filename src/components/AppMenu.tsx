@@ -212,7 +212,7 @@ export function AppMenu({ unit, onUnitChange }: AppMenuProps) {
                     }`}
                   >
                     <span className="text-sm">{lang.flag}</span>
-                    <span className="truncate flex-1">{lang.label}</span>
+                    <span className="truncate flex-1">{lang.native}</span>
                     {isActive && <span className="text-[10px]">✓</span>}
                   </button>
                 );

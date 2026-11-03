@@ -35,6 +35,7 @@ interface WeatherViewProps {
   isFav?: boolean;
   onToggleFavorite?: () => void;
   onOpenAiGallery?: () => void;
+  customBgUrl?: string | null;
 }
 
 type WearCategory = "casual" | "business" | "sports";
@@ -476,7 +477,8 @@ export const WeatherView: React.FC<WeatherViewProps> = ({
   const conditionLabel = getConditionLabel(w.current.code, t);
   const tempUnitStr = unit === "imperial" ? "°F" : "°C";
 
-  const speedUnits = SPEED_UNITS[lang] || SPEED_UNITS.en;
+  const speedUnits =
+    SPEED_UNITS[lang as keyof typeof SPEED_UNITS] || SPEED_UNITS.en;
   const speedUnitStr = unit === "imperial" ? speedUnits.imperial : speedUnits.metric;
 
   const uvVal = w.current.uvIndex;
