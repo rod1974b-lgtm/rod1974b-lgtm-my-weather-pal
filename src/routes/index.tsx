@@ -19,7 +19,6 @@ import {
 } from "@/lib/weather";
 import { WeatherView, type TickerAlertItem } from "@/components/WeatherView";
 import { AppMenu } from "@/components/AppMenu";
-import { LanguageSelector } from "@/components/LanguageSelector";
 import { AiGalleryModal } from "@/components/AiGalleryModal";
 
 export const Route = createFileRoute("/")({
@@ -486,33 +485,13 @@ function Index() {
           </div>
 
           <div className="flex items-center gap-2">
-            {/* Direct City Art Gallery Link */}
-            <Link
-              to="/gallery"
-              className="inline-flex items-center gap-1 rounded-full border border-border/80 bg-background/90 px-2.5 py-1 text-xs font-semibold shadow-xs hover:bg-muted transition-colors cursor-pointer"
-              title="Browse City Art Gallery"
-            >
-              <span>🎨</span>
-              <span className="hidden sm:inline">City Art</span>
-            </Link>
-
-            {/* AI Generator Modal Trigger */}
-            <button
-              type="button"
-              onClick={() => setShowAiGallery(true)}
-              className="inline-flex items-center gap-1 rounded-full border border-border/80 bg-background/90 px-2.5 py-1 text-xs font-semibold shadow-xs hover:bg-muted transition-colors cursor-pointer"
-            >
-              <span>✨</span>
-              <span className="hidden sm:inline">{t("art_gallery", "AI Gallery")}</span>
-            </button>
-
-            <LanguageSelector />
             <AppMenu
               unit={unit}
               onUnitChange={(u) => {
                 setUnit(u);
                 saveUnitPref(u);
               }}
+              onOpenAiGallery={() => setShowAiGallery(true)}
             />
           </div>
         </div>
