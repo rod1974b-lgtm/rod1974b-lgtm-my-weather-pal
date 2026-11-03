@@ -1352,7 +1352,8 @@ i18n.use(initReactI18next).init({
 
 if (typeof window !== "undefined") {
   window.addEventListener("weather:lang-change", (e: any) => {
-    const nextLang = e?.detail;
+    const raw = e?.detail;
+    const nextLang = typeof raw === "string" ? raw : raw?.lang || raw?.code;
     if (nextLang && Object.prototype.hasOwnProperty.call(resources, nextLang)) {
       i18n.changeLanguage(nextLang);
       localStorage.setItem("weather:lang", nextLang);
@@ -1361,6 +1362,7 @@ if (typeof window !== "undefined") {
     }
   });
 }
+
 
 if (typeof document !== "undefined") {
   document.documentElement.lang = savedLang;
