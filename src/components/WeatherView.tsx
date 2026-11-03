@@ -675,8 +675,52 @@ export const WeatherView: React.FC<WeatherViewProps> = ({
         )}
       </section>
 
-      {/* 2. HERO WEATHER CARD */}
-      <section className="relative overflow-hidden rounded-3xl border border-border/80 p-5 shadow-lg bg-card text-card-foreground min-h-[260px] flex flex-col justify-between">
+           {/* 2. TOP ACTIONS BAR (Art Gallery, Next Art, Favorite) */}
+      <div className="flex items-center justify-between px-1">
+        <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+          {w.place.name}
+        </span>
+        <div className="flex items-center gap-2">
+          {/* Art + Next Art Split Pill */}
+          <div className="inline-flex items-center rounded-xl backdrop-blur-md border border-border/80 shadow-xs p-0.5 bg-card/85 text-foreground">
+            <button
+              type="button"
+              onClick={() => (onOpenAiGallery ? onOpenAiGallery() : setGalleryOpen(true))}
+              className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold hover:opacity-80 rounded-lg transition cursor-pointer"
+              title={t("art_gallery", "AI Gallery")}
+            >
+              <span className="text-sm">🎨</span>
+              <span>{t("art", "Art")}</span>
+            </button>
+            <button
+              type="button"
+              onClick={handleNextArtwork}
+              className="px-2 py-1 text-xs font-medium hover:opacity-80 rounded-lg transition border-l border-border/60 cursor-pointer"
+              title={t("next_art", "Next Artwork")}
+            >
+              <span>↻</span>
+            </button>
+          </div>
+
+          {/* Favorite Toggle Button */}
+          {onToggleFavorite && (
+            <button
+              type="button"
+              onClick={onToggleFavorite}
+              className="p-1.5 px-2.5 rounded-xl border border-border/80 bg-card/85 text-foreground shadow-xs transition hover:bg-muted cursor-pointer"
+              title={isFav ? t("remove_favorite", "Remove from favorites") : t("add_favorite", "Add to favorites")}
+              aria-pressed={!!isFav}
+            >
+              <span className="inline-block text-sm">
+                {isFav ? "❤️" : "🤍"}
+              </span>
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* 3. STREAMLINED HERO CARD (Only City, Temp, and Weather Icon) */}
+      <section className="relative overflow-hidden rounded-3xl border border-border/80 p-5 shadow-lg bg-card text-card-foreground min-h-[220px] flex flex-col justify-between">
         {heroBgUrl && (
           <div
             className="absolute inset-0 bg-cover bg-center transition-all duration-700 pointer-events-none"
@@ -689,103 +733,60 @@ export const WeatherView: React.FC<WeatherViewProps> = ({
         <div className="absolute inset-0 bg-gradient-to-t from-background/70 via-background/10 to-transparent pointer-events-none" />
 
         <div className="relative z-10 flex flex-col justify-between h-full space-y-4">
+          {/* Top: City Name with frosted backing pill */}
           <div className="flex items-start justify-between">
-            <div>
-              <div className={cityBadgeClass}>
-                <h2 className="text-2xl sm:text-3xl font-extrabold tracking-tight">
-                  {w.place.name}
-                </h2>
-                {w.place.country && (
-                  <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-white/20 border border-white/30 text-white/90">
-                    {w.place.country}
-                  </span>
-                )}
-              </div>
-              <p className="inline-block text-[11px] font-medium mt-1 px-2 py-0.5 rounded-full backdrop-blur-md border shadow-xs bg-black/45 text-white/90 border-white/20">
-                {formatTimeAgo(w.fetchedAt, t)}
-              </p>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <div className={`inline-flex items-center rounded-xl backdrop-blur-md border shadow-xs p-0.5 transition-colors duration-300 ${actionBtnGlassBg}`}>
-                <button
-                  type="button"
-                  onClick={() => (onOpenAiGallery ? onOpenAiGallery() : setGalleryOpen(true))}
-                  className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold hover:opacity-80 rounded-lg transition cursor-pointer"
-                  title={t("art_gallery", "AI Gallery")}
-                >
-                  <span className="text-sm">🎨</span>
-                  <span>{t("art", "Art")}</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={handleNextArtwork}
-                  className="px-2 py-1 text-xs font-medium hover:opacity-80 rounded-lg transition border-l border-current/20 cursor-pointer"
-                  title={t("next_art", "Next Artwork")}
-                >
-                  <span>↻</span>
-                </button>
-              </div>
-
-              {onToggleFavorite && (
-                <button
-                  type="button"
-                  onClick={onToggleFavorite}
-                  className={`p-1.5 rounded-xl backdrop-blur-md border shadow-xs transition cursor-pointer ${actionBtnGlassBg}`}
-                  title={isFav ? t("remove_favorite", "Remove from favorites") : t("add_favorite", "Add to favorites")}
-                  aria-pressed={!!isFav}
-                >
-                  <span className="inline-block text-sm">
-                    {isFav ? "❤️" : "🤍"}
-                  </span>
-                </button>
-              )}
-
-              <button
-                type="button"
-                onClick={onRefresh}
-                disabled={loading}
-                className={`p-1.5 rounded-xl backdrop-blur-md border shadow-xs transition disabled:opacity-50 cursor-pointer ${actionBtnGlassBg}`}
-                title={t("refresh", "Refresh forecast")}
-              >
-                <span className={`inline-block text-sm ${loading ? "animate-spin" : ""}`}>
-                  🔄
+            <div className={cityBadgeClass}>
+              <h2 className="text-2xl sm:text-3xl font-extrabold tracking-tight">
+                {w.place.name}
+              </h2>
+              {w.place.country && (
+                <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-white/20 border border-white/30 text-white/90">
+                  {w.place.country}
                 </span>
-              </button>
+              )}
             </div>
           </div>
 
+          {/* Bottom: Big Temperature & Weather Icon */}
           <div className="flex items-end justify-between pt-2">
-            <div>
-              <div className={tempBadgeClass}>
-                <span className="text-5xl sm:text-6xl font-extrabold tracking-tighter">
-                  {tempVal}
-                </span>
-                <span className="text-2xl font-bold text-white/90">
-                  {tempUnitStr}
-                </span>
-              </div>
-              <div className="mt-1.5 flex flex-wrap items-center gap-2">
-                <span className={`inline-block text-base font-bold px-2.5 py-0.5 rounded-xl backdrop-blur-md border shadow-xs transition-colors duration-300 ${pillGlassBg}`}>
-                  {conditionLabel}
-                </span>
-                <span className={`inline-block text-xs font-semibold px-2 py-0.5 rounded-full backdrop-blur-md border shadow-xs transition-colors duration-300 ${pillGlassBg}`}>
-                  {t("feels_like", "Feels like")} {feelsVal}{tempUnitStr}
-                </span>
-              </div>
-            </div>
-
-            <div className="flex flex-col items-center">
-              <WeatherIcon
-                code={w.current.code}
-                isDay={w.current.is_day}
-                className="w-18 h-18 sm:w-20 sm:h-20 drop-shadow-lg"
-              />
-              <span className={`text-[11px] font-semibold mt-1 px-2.5 py-0.5 rounded-full backdrop-blur-md border shadow-xs transition-colors duration-300 ${pillGlassBg}`}>
-                {dayLabel}
+            <div className={tempBadgeClass}>
+              <span className="text-5xl sm:text-6xl font-extrabold tracking-tighter">
+                {tempVal}
+              </span>
+              <span className="text-2xl font-bold text-white/90">
+                {tempUnitStr}
               </span>
             </div>
+
+            <WeatherIcon
+              code={w.current.code}
+              isDay={w.current.is_day}
+              className="w-20 h-20 sm:w-24 sm:h-24 drop-shadow-xl"
+            />
           </div>
+        </div>
+      </section>
+
+      {/* 4. CURRENT CONDITIONS DETAILS CARD */}
+      <section className="p-3.5 px-4 rounded-2xl bg-card border border-border/70 shadow-xs text-card-foreground flex items-center justify-between flex-wrap gap-2 text-xs">
+        <div className="flex items-center gap-2">
+          <span className="font-bold text-sm text-foreground">
+            {conditionLabel}
+          </span>
+          <span className="text-muted-foreground">•</span>
+          <span className="font-medium text-muted-foreground">
+            {dayLabel}
+          </span>
+        </div>
+
+        <div className="flex items-center gap-3">
+          <span className="font-semibold text-foreground">
+            {t("feels_like", "Feels like")} {feelsVal}{tempUnitStr}
+          </span>
+          <span className="text-muted-foreground">•</span>
+          <span className="text-muted-foreground text-[11px]">
+            {formatTimeAgo(w.fetchedAt, t)}
+          </span>
         </div>
       </section>
 
