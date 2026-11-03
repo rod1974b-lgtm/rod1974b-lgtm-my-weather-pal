@@ -91,7 +91,8 @@ function CityArtGallery() {
       } else {
         const list = LANDMARK_WATERCOLORS[city];
         if (list && list.length > 0) {
-          map[city] = list[0];
+          const firstArt = list[0];
+          if (firstArt) map[city] = firstArt;
         }
       }
     });

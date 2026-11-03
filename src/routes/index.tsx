@@ -323,8 +323,9 @@ function Index() {
       if (galleryCity) {
         localStorage.removeItem("weather:last-searched-city");
         searchCity(galleryCity).then((results) => {
-          if (results.length > 0) {
-            handleSelectPlace(results[0]);
+          const firstResult = results[0];
+          if (firstResult) {
+            handleSelectPlace(firstResult);
           }
         });
       }

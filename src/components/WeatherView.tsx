@@ -727,6 +727,20 @@ export const WeatherView: React.FC<WeatherViewProps> = ({
                 </button>
               </div>
 
+              {onToggleFavorite && (
+                <button
+                  type="button"
+                  onClick={onToggleFavorite}
+                  className={`p-1.5 rounded-xl backdrop-blur-md border shadow-xs transition cursor-pointer ${actionBtnGlassBg}`}
+                  title={isFav ? t("remove_favorite", "Remove from favorites") : t("add_favorite", "Add to favorites")}
+                  aria-pressed={!!isFav}
+                >
+                  <span className="inline-block text-sm">
+                    {isFav ? "❤️" : "🤍"}
+                  </span>
+                </button>
+              )}
+
               <button
                 type="button"
                 onClick={onRefresh}
