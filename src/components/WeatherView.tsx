@@ -623,18 +623,15 @@ export const WeatherView: React.FC<WeatherViewProps> = ({
     }
   };
 
-  // Dynamic contrast classes based on artwork brightness
-  const cityTextColor = isDarkArtwork
-    ? "text-white drop-shadow-[0_2px_8px_rgba(0,0,0,0.85)]"
-    : "text-slate-900 drop-shadow-[0_1px_3px_rgba(255,255,255,0.95)]";
+  // Warm Gold / Amber contrast classes for all wallpapers
+  const cityTextColor =
+    "text-amber-400 drop-shadow-[0_2px_10px_rgba(0,0,0,0.92)]";
 
-  const tempTextColor = isDarkArtwork
-    ? "text-white drop-shadow-[0_2px_12px_rgba(0,0,0,0.85)]"
-    : "text-slate-900 drop-shadow-[0_1px_4px_rgba(255,255,255,0.95)]";
+  const tempTextColor =
+    "text-amber-400 drop-shadow-[0_2px_12px_rgba(0,0,0,0.92)]";
 
-  const tempUnitColor = isDarkArtwork
-    ? "text-white/90 drop-shadow-[0_2px_8px_rgba(0,0,0,0.85)]"
-    : "text-slate-800 drop-shadow-[0_1px_3px_rgba(255,255,255,0.95)]";
+  const tempUnitColor =
+    "text-amber-300 drop-shadow-[0_2px_8px_rgba(0,0,0,0.92)]";
 
   const pillGlassBg = isDarkArtwork
     ? "bg-black/50 text-white border-white/20"
