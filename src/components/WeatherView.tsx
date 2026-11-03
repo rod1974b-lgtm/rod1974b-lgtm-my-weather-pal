@@ -1,5 +1,6 @@
 // src/components/WeatherView.tsx
 import React, { useState, useEffect } from "react";
+import type { TFunction } from "i18next";
 import { type Weather, type WeatherUnit, type Place } from "@/lib/weather";
 import { WeatherIcon } from "@/lib/weatherIcons";
 import { useTranslation } from "react-i18next";
@@ -12,9 +13,13 @@ import { AiGalleryModal } from "@/components/AiGalleryModal";
 export interface TickerAlertItem {
   id: string;
   text: string;
-  severity: "disaster" | "warning" | "advisory" | "all-clear";
+  severity: "disaster" | "warning" | "advisory" | "all-clear" | "danger";
   tag?: string;
   tagKey?: string;
+  category?: string;
+  source?: string;
+  headline?: string;
+  urgency?: string;
 }
 
 interface WeatherViewProps {
@@ -27,6 +32,8 @@ interface WeatherViewProps {
   onRefresh: () => void;
   onSelectBg?: (url: string) => void;
   onSelectBackground?: (url: string) => void;
+  isFav?: boolean;
+  onToggleFavorite?: () => void;
 }
 
 type WearCategory = "casual" | "business" | "sports";
@@ -62,7 +69,7 @@ const WMO_KEY_MAP: Record<number, { key: string; fallback: string }> = {
   99: { key: "cond_thunderstorm", fallback: "Severe thunderstorm" },
 };
 
-function getConditionLabel(code: number, t: (k: string, fallback?: string) => string): string {
+function getConditionLabel(code: number, t: TFunction): string {
   const item = WMO_KEY_MAP[code];
   if (item) return t(item.key, item.fallback);
   if (code <= 2) return t("cond_partly_cloudy", "Partly cloudy");
@@ -76,7 +83,7 @@ function getConditionLabel(code: number, t: (k: string, fallback?: string) => st
   return t("cond_thunderstorm", "Thunderstorm");
 }
 
-function getUvLabel(uv: number, t: (k: string, fallback?: string) => string): string {
+function getUvLabel(uv: number, t: TFunction): string {
   if (uv <= 2) return t("uv_low", "Low");
   if (uv <= 5) return t("uv_moderate", "Moderate");
   if (uv <= 7) return t("uv_high", "High");
@@ -84,7 +91,7 @@ function getUvLabel(uv: number, t: (k: string, fallback?: string) => string): st
   return t("uv_extreme", "Extreme");
 }
 
-function getAqiLabel(aqi: number | undefined, t: (k: string, fallback?: string) => string): string {
+function getAqiLabel(aqi: number | undefined, t: TFunction): string {
   if (aqi === undefined) return "—";
   if (aqi <= 50) return t("aqi_good", "Good");
   if (aqi <= 100) return t("aqi_moderate", "Moderate");
@@ -94,7 +101,7 @@ function getAqiLabel(aqi: number | undefined, t: (k: string, fallback?: string) 
   return t("aqi_unhealthy", "Hazardous");
 }
 
-function formatTimeAgo(timestamp: number, t: (k: string, fallback?: string) => string): string {
+function formatTimeAgo(timestamp: number, t: TFunction): string {
   if (!timestamp) return t("updated_now", "Updated just now");
   const diffSec = Math.floor((Date.now() - timestamp) / 1000);
   if (diffSec < 60) return t("updated_now", "Updated just now");
@@ -312,6 +319,8 @@ export const WeatherView: React.FC<WeatherViewProps> = ({
   onRefresh,
   onSelectBg,
   onSelectBackground,
+  isFav,
+  onToggleFavorite,
 }) => {
   const { t, i18n } = useTranslation();
   const lang = i18n?.language?.toLowerCase().split("-")[0] || "en";
@@ -477,8 +486,8 @@ export const WeatherView: React.FC<WeatherViewProps> = ({
   const alertsToDisplay = activeAlerts.length > 0 ? activeAlerts : disasters;
   const dayLabel = (w.current.is_day ? DAY_LABELS[lang] : NIGHT_LABELS[lang]) || (w.current.is_day ? "Day" : "Night");
 
-  const catLabels = WEAR_CATEGORIES[lang] || WEAR_CATEGORIES.en;
-  const accLabels = ACCESSORY_LABELS[lang] || ACCESSORY_LABELS.en;
+  const catLabels = WEAR_CATEGORIES[lang] || WEAR_CATEGORIES.en!;
+  const accLabels = ACCESSORY_LABELS[lang] || ACCESSORY_LABELS.en!;
 
   // Temperature normalized in Celsius for advice logic
   const tempC = unit === "imperial" ? ((w.current.temp - 32) * 5) / 9 : w.current.temp;
@@ -839,7 +848,7 @@ export const WeatherView: React.FC<WeatherViewProps> = ({
           <div className="flex items-center gap-1.5 text-[11px] font-medium text-amber-800 dark:text-amber-300 bg-amber-500/10 px-2.5 py-1 rounded-lg border border-amber-500/20">
             <span>🌙</span>
             <span>
-              {accLabels.evening_drop} {Math.round(todayForecast.min)}{tempUnitStr}
+              {accLabels["evening_drop"]} {Math.round(todayForecast.min)}{tempUnitStr}
             </span>
           </div>
         )}
