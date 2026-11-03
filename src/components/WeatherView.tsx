@@ -675,39 +675,29 @@ export const WeatherView: React.FC<WeatherViewProps> = ({
         )}
       </section>
 
-      {/* 2. TOP ACTIONS BAR (Art Gallery, Next Art, Favorite) */}
+           {/* 2. TOP ACTIONS BAR (Next Art & Favorite) */}
       <div className="flex items-center justify-between px-1">
         <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
           {w.place.name}
         </span>
         <div className="flex items-center gap-2">
-          {/* Art + Next Art Split Pill */}
-          <div className="inline-flex items-center rounded-xl backdrop-blur-md border border-border/80 shadow-xs p-0.5 bg-card/85 text-foreground">
-            <button
-              type="button"
-              onClick={() => (onOpenAiGallery ? onOpenAiGallery() : setGalleryOpen(true))}
-              className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold hover:opacity-80 rounded-lg transition cursor-pointer"
-              title={t("art_gallery", "AI Gallery")}
-            >
-              <span className="text-sm">🎨</span>
-              <span>{t("art", "Art")}</span>
-            </button>
-            <button
-              type="button"
-              onClick={handleNextArtwork}
-              className="px-2 py-1 text-xs font-medium hover:opacity-80 rounded-lg transition border-l border-border/60 cursor-pointer"
-              title={t("next_art", "Next Artwork")}
-            >
-              <span>↻</span>
-            </button>
-          </div>
+          {/* Next Artwork Button */}
+          <button
+            type="button"
+            onClick={handleNextArtwork}
+            className="flex items-center gap-1.5 rounded-xl border border-border/80 bg-card/85 px-3 py-1.5 text-xs font-semibold text-foreground shadow-xs backdrop-blur-md transition hover:bg-muted cursor-pointer"
+            title={t("next_art", "Next Artwork")}
+          >
+            <span className="text-sm">↻</span>
+            <span>{t("next_art", "Next Art")}</span>
+          </button>
 
           {/* Favorite Toggle Button */}
           {onToggleFavorite && (
             <button
               type="button"
               onClick={onToggleFavorite}
-              className="p-1.5 px-2.5 rounded-xl border border-border/80 bg-card/85 text-foreground shadow-xs transition hover:bg-muted cursor-pointer"
+              className="flex items-center justify-center rounded-xl border border-border/80 bg-card/85 px-3 py-1.5 text-xs font-semibold text-foreground shadow-xs backdrop-blur-md transition hover:bg-muted cursor-pointer"
               title={isFav ? t("remove_favorite", "Remove from favorites") : t("add_favorite", "Add to favorites")}
               aria-pressed={!!isFav}
             >
