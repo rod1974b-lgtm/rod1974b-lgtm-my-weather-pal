@@ -623,15 +623,12 @@ export const WeatherView: React.FC<WeatherViewProps> = ({
     }
   };
 
-  // Warm Gold / Amber contrast classes for all wallpapers
-  const cityTextColor =
-    "text-amber-400 drop-shadow-[0_2px_10px_rgba(0,0,0,0.92)]";
+  // Frosted Dark Pill styling for guaranteed contrast across all wallpapers
+  const cityBadgeClass =
+    "inline-flex items-center gap-2 px-3 py-1 rounded-2xl bg-black/55 backdrop-blur-md border border-white/20 shadow-md text-white";
 
-  const tempTextColor =
-    "text-amber-400 drop-shadow-[0_2px_12px_rgba(0,0,0,0.92)]";
-
-  const tempUnitColor =
-    "text-amber-300 drop-shadow-[0_2px_8px_rgba(0,0,0,0.92)]";
+  const tempBadgeClass =
+    "inline-flex items-baseline gap-1.5 px-3.5 py-1 rounded-2xl bg-black/55 backdrop-blur-md border border-white/20 shadow-md text-white";
 
   const pillGlassBg = isDarkArtwork
     ? "bg-black/50 text-white border-white/20"
@@ -694,17 +691,17 @@ export const WeatherView: React.FC<WeatherViewProps> = ({
         <div className="relative z-10 flex flex-col justify-between h-full space-y-4">
           <div className="flex items-start justify-between">
             <div>
-              <div className="flex items-center gap-2">
-                <h2 className={`text-2xl sm:text-3xl font-extrabold tracking-tight transition-colors duration-300 ${cityTextColor}`}>
+              <div className={cityBadgeClass}>
+                <h2 className="text-2xl sm:text-3xl font-extrabold tracking-tight">
                   {w.place.name}
                 </h2>
                 {w.place.country && (
-                  <span className={`text-xs font-semibold px-2 py-0.5 rounded-full backdrop-blur-md border shadow-xs transition-colors duration-300 ${pillGlassBg}`}>
+                  <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-white/20 border border-white/30 text-white/90">
                     {w.place.country}
                   </span>
                 )}
               </div>
-              <p className={`inline-block text-[11px] font-medium mt-1 px-2 py-0.5 rounded-full backdrop-blur-md border shadow-xs transition-colors duration-300 ${pillGlassBg}`}>
+              <p className="inline-block text-[11px] font-medium mt-1 px-2 py-0.5 rounded-full backdrop-blur-md border shadow-xs bg-black/45 text-white/90 border-white/20">
                 {formatTimeAgo(w.fetchedAt, t)}
               </p>
             </div>
@@ -760,15 +757,15 @@ export const WeatherView: React.FC<WeatherViewProps> = ({
 
           <div className="flex items-end justify-between pt-2">
             <div>
-              <div className="flex items-baseline gap-1">
-                <span className={`text-5xl sm:text-6xl font-extrabold tracking-tighter transition-colors duration-300 ${tempTextColor}`}>
+              <div className={tempBadgeClass}>
+                <span className="text-5xl sm:text-6xl font-extrabold tracking-tighter">
                   {tempVal}
                 </span>
-                <span className={`text-2xl font-bold transition-colors duration-300 ${tempUnitColor}`}>
+                <span className="text-2xl font-bold text-white/90">
                   {tempUnitStr}
                 </span>
               </div>
-              <div className="mt-1 flex flex-wrap items-center gap-2">
+              <div className="mt-1.5 flex flex-wrap items-center gap-2">
                 <span className={`inline-block text-base font-bold px-2.5 py-0.5 rounded-xl backdrop-blur-md border shadow-xs transition-colors duration-300 ${pillGlassBg}`}>
                   {conditionLabel}
                 </span>
