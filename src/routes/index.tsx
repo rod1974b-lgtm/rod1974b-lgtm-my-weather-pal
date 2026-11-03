@@ -607,6 +607,7 @@ function Index() {
           <WeatherView
             weather={weather}
             activeAlerts={alerts}
+            unit={unit}
             loading={loading}
             onRefresh={() => fetchAllWeatherData(place, unit)}
             isFav={isFavorite(place, favorites)}

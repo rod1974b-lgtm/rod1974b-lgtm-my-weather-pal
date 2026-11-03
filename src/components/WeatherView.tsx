@@ -123,7 +123,7 @@ const NIGHT_LABELS: Record<string, string> = {
   fr: "Nuit", de: "Nacht", pt: "Noite", ru: "Ночь", ar: "ليل", ko: "밤", id: "Malam", vi: "Đêm",
 };
 
-const SPEED_UNITS: Record<string, { imperial: string; metric: string }> = {
+const SPEED_UNITS = {
   en: { imperial: "mph", metric: "km/h" },
   th: { imperial: "ไมล์/ชม.", metric: "กม./ชม." },
   es: { imperial: "mph", metric: "km/h" },
