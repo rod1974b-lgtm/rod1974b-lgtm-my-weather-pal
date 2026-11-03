@@ -156,7 +156,7 @@ const WEAR_CATEGORIES = {
   vi: { casual: "Hàng ngày", business: "Công sở", sports: "Thể thao" },
 };
 
-const ACCESSORY_LABELS: Record<string, Record<string, string>> = {
+const ACCESSORY_LABELS = {
   en: {
     umbrella: "Umbrella",
     sunglasses: "Sunglasses",
@@ -488,8 +488,10 @@ export const WeatherView: React.FC<WeatherViewProps> = ({
   const alertsToDisplay = activeAlerts.length > 0 ? activeAlerts : disasters;
   const dayLabel = (w.current.is_day ? DAY_LABELS[lang] : NIGHT_LABELS[lang]) || (w.current.is_day ? "Day" : "Night");
 
-  const catLabels = WEAR_CATEGORIES[lang] || WEAR_CATEGORIES.en!;
-  const accLabels = ACCESSORY_LABELS[lang] || ACCESSORY_LABELS.en!;
+  const catLabels =
+    WEAR_CATEGORIES[lang as keyof typeof WEAR_CATEGORIES] || WEAR_CATEGORIES.en;
+  const accLabels =
+    ACCESSORY_LABELS[lang as keyof typeof ACCESSORY_LABELS] || ACCESSORY_LABELS.en;
 
   // Temperature normalized in Celsius for advice logic
   const tempC = unit === "imperial" ? ((w.current.temp - 32) * 5) / 9 : w.current.temp;
