@@ -1,5 +1,6 @@
 // src/components/WeatherView.tsx
 import React, { useState, useEffect } from "react";
+import type { TFunction } from "i18next";
 import { type Weather, type WeatherUnit, type Place } from "@/lib/weather";
 import { WeatherIcon } from "@/lib/weatherIcons";
 import { useTranslation } from "react-i18next";
@@ -11,10 +12,14 @@ import { AiGalleryModal } from "@/components/AiGalleryModal";
 
 export interface TickerAlertItem {
   id: string;
-  text: string;
-  severity: "disaster" | "warning" | "advisory" | "all-clear";
+  text?: string;
+  severity: "disaster" | "warning" | "advisory" | "all-clear" | "danger";
   tag?: string;
   tagKey?: string;
+  category?: string;
+  source?: string;
+  headline?: string;
+  urgency?: string;
 }
 
 interface WeatherViewProps {
@@ -27,6 +32,10 @@ interface WeatherViewProps {
   onRefresh: () => void;
   onSelectBg?: (url: string) => void;
   onSelectBackground?: (url: string) => void;
+  isFav?: boolean;
+  onToggleFavorite?: () => void;
+  onOpenAiGallery?: () => void;
+  customBgUrl?: string | null;
 }
 
 type WearCategory = "casual" | "business" | "sports";
@@ -62,7 +71,7 @@ const WMO_KEY_MAP: Record<number, { key: string; fallback: string }> = {
   99: { key: "cond_thunderstorm", fallback: "Severe thunderstorm" },
 };
 
-function getConditionLabel(code: number, t: (k: string, fallback?: string) => string): string {
+function getConditionLabel(code: number, t: TFunction): string {
   const item = WMO_KEY_MAP[code];
   if (item) return t(item.key, item.fallback);
   if (code <= 2) return t("cond_partly_cloudy", "Partly cloudy");
@@ -76,7 +85,7 @@ function getConditionLabel(code: number, t: (k: string, fallback?: string) => st
   return t("cond_thunderstorm", "Thunderstorm");
 }
 
-function getUvLabel(uv: number, t: (k: string, fallback?: string) => string): string {
+function getUvLabel(uv: number, t: TFunction): string {
   if (uv <= 2) return t("uv_low", "Low");
   if (uv <= 5) return t("uv_moderate", "Moderate");
   if (uv <= 7) return t("uv_high", "High");
@@ -84,7 +93,7 @@ function getUvLabel(uv: number, t: (k: string, fallback?: string) => string): st
   return t("uv_extreme", "Extreme");
 }
 
-function getAqiLabel(aqi: number | undefined, t: (k: string, fallback?: string) => string): string {
+function getAqiLabel(aqi: number | undefined, t: TFunction): string {
   if (aqi === undefined) return "—";
   if (aqi <= 50) return t("aqi_good", "Good");
   if (aqi <= 100) return t("aqi_moderate", "Moderate");
@@ -94,7 +103,7 @@ function getAqiLabel(aqi: number | undefined, t: (k: string, fallback?: string) 
   return t("aqi_unhealthy", "Hazardous");
 }
 
-function formatTimeAgo(timestamp: number, t: (k: string, fallback?: string) => string): string {
+function formatTimeAgo(timestamp: number, t: TFunction): string {
   if (!timestamp) return t("updated_now", "Updated just now");
   const diffSec = Math.floor((Date.now() - timestamp) / 1000);
   if (diffSec < 60) return t("updated_now", "Updated just now");
@@ -114,7 +123,7 @@ const NIGHT_LABELS: Record<string, string> = {
   fr: "Nuit", de: "Nacht", pt: "Noite", ru: "Ночь", ar: "ليل", ko: "밤", id: "Malam", vi: "Đêm",
 };
 
-const SPEED_UNITS: Record<string, { imperial: string; metric: string }> = {
+const SPEED_UNITS = {
   en: { imperial: "mph", metric: "km/h" },
   th: { imperial: "ไมล์/ชม.", metric: "กม./ชม." },
   es: { imperial: "mph", metric: "km/h" },
@@ -131,7 +140,7 @@ const SPEED_UNITS: Record<string, { imperial: string; metric: string }> = {
   vi: { imperial: "dặm/h", metric: "km/h" },
 };
 
-const WEAR_CATEGORIES: Record<string, { casual: string; business: string; sports: string }> = {
+const WEAR_CATEGORIES = {
   en: { casual: "Casual", business: "Business", sports: "Sports" },
   th: { casual: "ทั่วไป", business: "ทำงาน", sports: "ออกกำลังกาย" },
   es: { casual: "Casual", business: "Negocios", sports: "Deporte" },
@@ -148,7 +157,7 @@ const WEAR_CATEGORIES: Record<string, { casual: string; business: string; sports
   vi: { casual: "Hàng ngày", business: "Công sở", sports: "Thể thao" },
 };
 
-const ACCESSORY_LABELS: Record<string, Record<string, string>> = {
+const ACCESSORY_LABELS = {
   en: {
     umbrella: "Umbrella",
     sunglasses: "Sunglasses",
@@ -312,6 +321,9 @@ export const WeatherView: React.FC<WeatherViewProps> = ({
   onRefresh,
   onSelectBg,
   onSelectBackground,
+  isFav,
+  onToggleFavorite,
+  onOpenAiGallery,
 }) => {
   const { t, i18n } = useTranslation();
   const lang = i18n?.language?.toLowerCase().split("-")[0] || "en";
@@ -465,7 +477,8 @@ export const WeatherView: React.FC<WeatherViewProps> = ({
   const conditionLabel = getConditionLabel(w.current.code, t);
   const tempUnitStr = unit === "imperial" ? "°F" : "°C";
 
-  const speedUnits = SPEED_UNITS[lang] || SPEED_UNITS.en;
+  const speedUnits =
+    SPEED_UNITS[lang as keyof typeof SPEED_UNITS] || SPEED_UNITS.en;
   const speedUnitStr = unit === "imperial" ? speedUnits.imperial : speedUnits.metric;
 
   const uvVal = w.current.uvIndex;
@@ -477,8 +490,10 @@ export const WeatherView: React.FC<WeatherViewProps> = ({
   const alertsToDisplay = activeAlerts.length > 0 ? activeAlerts : disasters;
   const dayLabel = (w.current.is_day ? DAY_LABELS[lang] : NIGHT_LABELS[lang]) || (w.current.is_day ? "Day" : "Night");
 
-  const catLabels = WEAR_CATEGORIES[lang] || WEAR_CATEGORIES.en;
-  const accLabels = ACCESSORY_LABELS[lang] || ACCESSORY_LABELS.en;
+  const catLabels =
+    WEAR_CATEGORIES[lang as keyof typeof WEAR_CATEGORIES] || WEAR_CATEGORIES.en;
+  const accLabels =
+    ACCESSORY_LABELS[lang as keyof typeof ACCESSORY_LABELS] || ACCESSORY_LABELS.en;
 
   // Temperature normalized in Celsius for advice logic
   const tempC = unit === "imperial" ? ((w.current.temp - 32) * 5) / 9 : w.current.temp;
@@ -651,7 +666,7 @@ export const WeatherView: React.FC<WeatherViewProps> = ({
                       <span className="px-1.5 py-0.5 rounded-md font-semibold text-[10px] uppercase bg-amber-500/20 text-amber-800 dark:text-amber-300">
                         {displayTag}
                       </span>
-                      <span>{alt.text}</span>
+                      <span>{alt.text ?? alt.headline ?? ""}</span>
                     </div>
                   );
                 })}
@@ -701,7 +716,7 @@ export const WeatherView: React.FC<WeatherViewProps> = ({
               <div className={`inline-flex items-center rounded-xl backdrop-blur-md border shadow-xs p-0.5 transition-colors duration-300 ${actionBtnGlassBg}`}>
                 <button
                   type="button"
-                  onClick={() => setGalleryOpen(true)}
+                  onClick={() => (onOpenAiGallery ? onOpenAiGallery() : setGalleryOpen(true))}
                   className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold hover:opacity-80 rounded-lg transition cursor-pointer"
                   title={t("art_gallery", "AI Gallery")}
                 >
@@ -717,6 +732,20 @@ export const WeatherView: React.FC<WeatherViewProps> = ({
                   <span>↻</span>
                 </button>
               </div>
+
+              {onToggleFavorite && (
+                <button
+                  type="button"
+                  onClick={onToggleFavorite}
+                  className={`p-1.5 rounded-xl backdrop-blur-md border shadow-xs transition cursor-pointer ${actionBtnGlassBg}`}
+                  title={isFav ? t("remove_favorite", "Remove from favorites") : t("add_favorite", "Add to favorites")}
+                  aria-pressed={!!isFav}
+                >
+                  <span className="inline-block text-sm">
+                    {isFav ? "❤️" : "🤍"}
+                  </span>
+                </button>
+              )}
 
               <button
                 type="button"
@@ -839,7 +868,7 @@ export const WeatherView: React.FC<WeatherViewProps> = ({
           <div className="flex items-center gap-1.5 text-[11px] font-medium text-amber-800 dark:text-amber-300 bg-amber-500/10 px-2.5 py-1 rounded-lg border border-amber-500/20">
             <span>🌙</span>
             <span>
-              {accLabels.evening_drop} {Math.round(todayForecast.min)}{tempUnitStr}
+              {accLabels["evening_drop"]} {Math.round(todayForecast.min)}{tempUnitStr}
             </span>
           </div>
         )}

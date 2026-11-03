@@ -323,8 +323,9 @@ function Index() {
       if (galleryCity) {
         localStorage.removeItem("weather:last-searched-city");
         searchCity(galleryCity).then((results) => {
-          if (results.length > 0) {
-            handleSelectPlace(results[0]);
+          const firstResult = results[0];
+          if (firstResult) {
+            handleSelectPlace(firstResult);
           }
         });
       }
@@ -440,7 +441,7 @@ function Index() {
   };
 
   const handleToggleFavorite = () => {
-    const updated = isFavorite(favorites, place)
+    const updated = isFavorite(place, favorites)
       ? favorites.filter((f) => !isSamePlace(f, place))
       : [...favorites, place];
     setFavorites(updated);
@@ -606,9 +607,10 @@ function Index() {
           <WeatherView
             weather={weather}
             activeAlerts={alerts}
+            unit={unit}
             loading={loading}
             onRefresh={() => fetchAllWeatherData(place, unit)}
-            isFav={isFavorite(favorites, place)}
+            isFav={isFavorite(place, favorites)}
             onToggleFavorite={handleToggleFavorite}
             onSelectBackground={handleSelectCustomBg}
             onOpenAiGallery={() => setShowAiGallery(true)}
@@ -623,8 +625,8 @@ function Index() {
           isOpen={showAiGallery}
           onClose={() => setShowAiGallery(false)}
           cityName={weather.place.name}
-          country={weather.place.country}
-          weatherDesc={describe(weather.current.code)}
+          country={weather.place.country ?? ""}
+          weatherDesc={describe(weather.current.code).label}
           weatherCode={weather.current.code}
           currentTemp={
             weather.unit === "imperial"
