@@ -502,7 +502,7 @@ export const WeatherView: React.FC<WeatherViewProps> = ({
   const isSnowing = (code >= 71 && code <= 77) || (code >= 85 && code <= 86);
   const windKmh = unit === "imperial" ? w.current.wind * 1.60934 : w.current.wind;
 
-  // Category-specific clothing advice generator
+   // Category-specific clothing advice generator
   const getExpandedClothingAdvice = (): string => {
     if (wearCategory === "business") {
       if (isRaining) {
@@ -623,12 +623,12 @@ export const WeatherView: React.FC<WeatherViewProps> = ({
     }
   };
 
-  // Frosted Dark Pill styling for guaranteed contrast across all wallpapers
+  // 100% transparent styling with deep drop-shadow for contrast over any artwork
   const cityBadgeClass =
-    "inline-flex items-center gap-2 px-3 py-1 rounded-2xl bg-black/55 backdrop-blur-md border border-white/20 shadow-md text-white";
+    "inline-flex items-center gap-2 text-white drop-shadow-[0_2px_8px_rgba(0,0,0,0.85)]";
 
   const tempBadgeClass =
-    "inline-flex items-baseline gap-1.5 px-3.5 py-1 rounded-2xl bg-black/55 backdrop-blur-md border border-white/20 shadow-md text-white";
+    "inline-flex items-baseline gap-1 text-white drop-shadow-[0_2px_8px_rgba(0,0,0,0.85)]";
 
   const pillGlassBg = isDarkArtwork
     ? "bg-black/50 text-white border-white/20"
@@ -675,7 +675,7 @@ export const WeatherView: React.FC<WeatherViewProps> = ({
         )}
       </section>
 
-           {/* 2. TOP ACTIONS BAR (Art Gallery, Next Art, Favorite) */}
+      {/* 2. TOP ACTIONS BAR (Art Gallery, Next Art, Favorite) */}
       <div className="flex items-center justify-between px-1">
         <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
           {w.place.name}
@@ -733,22 +733,22 @@ export const WeatherView: React.FC<WeatherViewProps> = ({
         <div className="absolute inset-0 bg-gradient-to-t from-background/70 via-background/10 to-transparent pointer-events-none" />
 
         <div className="relative z-10 flex flex-col justify-between h-full space-y-4">
-          {/* Top: City Name with frosted backing pill */}
+          {/* Top: City Name (Transparent) */}
           <div className="flex items-start justify-between">
             <div className={cityBadgeClass}>
               <h2 className="text-2xl sm:text-3xl font-extrabold tracking-tight">
                 {w.place.name}
               </h2>
               {w.place.country && (
-                <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-white/20 border border-white/30 text-white/90">
+                <span className="text-xs font-semibold px-2 py-0.5 rounded-full border border-white/40 text-white/95">
                   {w.place.country}
                 </span>
               )}
             </div>
           </div>
 
-          {/* Bottom: Big Temperature & Weather Icon */}
-          <div className="flex items-end justify-between pt-2">
+          {/* Bottom: Big Temperature & Weather Icon locked to bottom */}
+          <div className="mt-auto flex items-end justify-between pt-4">
             <div className={tempBadgeClass}>
               <span className="text-5xl sm:text-6xl font-extrabold tracking-tighter">
                 {tempVal}
@@ -761,7 +761,7 @@ export const WeatherView: React.FC<WeatherViewProps> = ({
             <WeatherIcon
               code={w.current.code}
               isDay={w.current.is_day}
-              className="w-20 h-20 sm:w-24 sm:h-24 drop-shadow-xl"
+              className="w-20 h-20 sm:w-24 sm:h-24 drop-shadow-[0_4px_12px_rgba(0,0,0,0.6)]"
             />
           </div>
         </div>
@@ -790,7 +790,7 @@ export const WeatherView: React.FC<WeatherViewProps> = ({
         </div>
       </section>
 
-      {/* 3. WHAT TO WEAR RECOMMENDATION (Expanded with Occasion & Accessories) */}
+      {/* 5. WHAT TO WEAR RECOMMENDATION (Expanded with Occasion & Accessories) */}
       <section className="p-4 rounded-2xl bg-card border border-border/70 shadow-xs text-card-foreground space-y-3">
         <div className="flex items-center justify-between gap-2 flex-wrap">
           <div className="flex items-center gap-2">
@@ -869,7 +869,7 @@ export const WeatherView: React.FC<WeatherViewProps> = ({
         )}
       </section>
 
-      {/* 4. HOURLY FORECAST (24 Hours Rolling from Now) */}
+      {/* 6. HOURLY FORECAST (24 Hours Rolling from Now) */}
       <section className="p-4 rounded-2xl bg-card border border-border/70 shadow-xs text-card-foreground">
         <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">
           {t("hourly_forecast", "Hourly Forecast")}
@@ -911,7 +911,7 @@ export const WeatherView: React.FC<WeatherViewProps> = ({
         </div>
       </section>
 
-      {/* 5. 7-DAY EXTENDED FORECAST */}
+      {/* 7. 7-DAY EXTENDED FORECAST */}
       <section className="p-4 rounded-2xl bg-card border border-border/70 shadow-xs text-card-foreground">
         <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">
           {t("daily_forecast", "7-Day Forecast")}
@@ -949,7 +949,7 @@ export const WeatherView: React.FC<WeatherViewProps> = ({
         </div>
       </section>
 
-      {/* 6. KEY METRICS GRID */}
+      {/* 8. KEY METRICS GRID */}
       <section className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
         <div className="p-3.5 rounded-2xl bg-card border border-border/70 shadow-xs">
           <span className="text-xs font-semibold text-muted-foreground">
@@ -988,7 +988,7 @@ export const WeatherView: React.FC<WeatherViewProps> = ({
         </div>
       </section>
 
-      {/* 7. SUNRISE & SUNSET */}
+      {/* 9. SUNRISE & SUNSET */}
       <section className="grid grid-cols-2 gap-2.5">
         <div className="p-3.5 rounded-2xl bg-card border border-border/70 shadow-xs flex items-center gap-3">
           <span className="text-2xl">🌅</span>
