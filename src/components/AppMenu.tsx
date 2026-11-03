@@ -7,6 +7,7 @@ import type { WeatherUnit } from "@/lib/weather";
 interface AppMenuProps {
   unit: WeatherUnit;
   onUnitChange: (unit: WeatherUnit) => void;
+  onOpenAiGallery?: () => void;
 }
 
 const SKY_PREFS = [
@@ -24,7 +25,7 @@ const FONT_SIZES = [
   { value: "130%", label: "Huge (130%)" },
 ];
 
-export function AppMenu({ unit, onUnitChange }: AppMenuProps) {
+export function AppMenu({ unit, onUnitChange, onOpenAiGallery }: AppMenuProps) {
   const { t, i18n } = useTranslation();
   const [open, setOpen] = useState(false);
   const [skyPref, setSkyPref] = useState("auto");
@@ -230,6 +231,18 @@ export function AppMenu({ unit, onUnitChange }: AppMenuProps) {
               >
                 🎨 {t("city_art", "City Art")}
               </Link>
+              {onOpenAiGallery && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setOpen(false);
+                    onOpenAiGallery();
+                  }}
+                  className="hover:text-foreground underline underline-offset-2 font-medium cursor-pointer"
+                >
+                  ✨ {t("art_gallery", "AI Gallery")}
+                </button>
+              )}
               <Link
                 to="/privacy"
                 onClick={() => setOpen(false)}
