@@ -719,8 +719,8 @@ export const WeatherView: React.FC<WeatherViewProps> = ({
         </div>
       </div>
 
-      {/* 3. STREAMLINED HERO CARD (Only City, Temp, and Weather Icon) */}
-      <section className="relative overflow-hidden rounded-3xl border border-border/80 p-5 shadow-lg bg-card text-card-foreground min-h-[220px] flex flex-col justify-between">
+          {/* 3. STREAMLINED HERO CARD (Only City, Temp, and Weather Icon) */}
+      <section className="relative overflow-hidden rounded-3xl border border-border/80 p-5 shadow-lg bg-card text-card-foreground min-h-[250px] flex flex-col justify-between">
         {heroBgUrl && (
           <div
             className="absolute inset-0 bg-cover bg-center transition-all duration-700 pointer-events-none"
@@ -732,7 +732,7 @@ export const WeatherView: React.FC<WeatherViewProps> = ({
         )}
         <div className="absolute inset-0 bg-gradient-to-t from-background/70 via-background/10 to-transparent pointer-events-none" />
 
-        <div className="relative z-10 flex flex-col justify-between h-full space-y-4">
+        <div className="relative z-10 flex flex-col justify-between flex-1 w-full">
           {/* Top: City Name (Transparent) */}
           <div className="flex items-start justify-between">
             <div className={cityBadgeClass}>
@@ -747,7 +747,7 @@ export const WeatherView: React.FC<WeatherViewProps> = ({
             </div>
           </div>
 
-          {/* Bottom: Big Temperature & Weather Icon locked to bottom */}
+          {/* Bottom: Big Temperature & Weather Icon locked to bottom edge */}
           <div className="mt-auto flex items-end justify-between pt-4">
             <div className={tempBadgeClass}>
               <span className="text-5xl sm:text-6xl font-extrabold tracking-tighter">
