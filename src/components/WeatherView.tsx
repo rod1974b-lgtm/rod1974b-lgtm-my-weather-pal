@@ -12,7 +12,7 @@ import { AiGalleryModal } from "@/components/AiGalleryModal";
 
 export interface TickerAlertItem {
   id: string;
-  text: string;
+  text?: string;
   severity: "disaster" | "warning" | "advisory" | "all-clear" | "danger";
   tag?: string;
   tagKey?: string;
@@ -34,6 +34,7 @@ interface WeatherViewProps {
   onSelectBackground?: (url: string) => void;
   isFav?: boolean;
   onToggleFavorite?: () => void;
+  onOpenAiGallery?: () => void;
 }
 
 type WearCategory = "casual" | "business" | "sports";
@@ -321,6 +322,7 @@ export const WeatherView: React.FC<WeatherViewProps> = ({
   onSelectBackground,
   isFav,
   onToggleFavorite,
+  onOpenAiGallery,
 }) => {
   const { t, i18n } = useTranslation();
   const lang = i18n?.language?.toLowerCase().split("-")[0] || "en";
@@ -660,7 +662,7 @@ export const WeatherView: React.FC<WeatherViewProps> = ({
                       <span className="px-1.5 py-0.5 rounded-md font-semibold text-[10px] uppercase bg-amber-500/20 text-amber-800 dark:text-amber-300">
                         {displayTag}
                       </span>
-                      <span>{alt.text}</span>
+                      <span>{alt.text ?? alt.headline ?? ""}</span>
                     </div>
                   );
                 })}

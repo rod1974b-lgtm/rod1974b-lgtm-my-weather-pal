@@ -625,7 +625,7 @@ function Index() {
           onClose={() => setShowAiGallery(false)}
           cityName={weather.place.name}
           country={weather.place.country}
-          weatherDesc={describe(weather.current.code)}
+          weatherDesc={describe(weather.current.code).label}
           weatherCode={weather.current.code}
           currentTemp={
             weather.unit === "imperial"
