@@ -1052,69 +1052,7 @@ export const WeatherView: React.FC<WeatherViewProps> = ({
         </div>
       </section>
 
-      {/* 8. KEY METRICS GRID */}
-      <section className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-        <div className="p-3.5 rounded-2xl bg-card border border-border/70 shadow-xs">
-          <span className="text-xs font-semibold text-muted-foreground">
-            {t("wind", "Wind")}
-          </span>
-          <p className="text-lg font-bold mt-1">
-            {Math.round(w.current.wind)} <span className="text-xs font-normal text-muted-foreground">{speedUnitStr}</span>
-          </p>
-        </div>
-
-        <div className="p-3.5 rounded-2xl bg-card border border-border/70 shadow-xs">
-          <span className="text-xs font-semibold text-muted-foreground">
-            {t("humidity", "Humidity")}
-          </span>
-          <p className="text-lg font-bold mt-1">
-            {w.current.humidity}%
-          </p>
-        </div>
-
-        <div className="p-3.5 rounded-2xl bg-card border border-border/70 shadow-xs">
-          <span className="text-xs font-semibold text-muted-foreground">
-            {t("uv_index", "UV Index")}
-          </span>
-          <p className="text-lg font-bold mt-1">
-            {uvVal} <span className="text-xs font-normal text-muted-foreground">({uvCategoryStr})</span>
-          </p>
-        </div>
-
-        <div className="p-3.5 rounded-2xl bg-card border border-border/70 shadow-xs">
-          <span className="text-xs font-semibold text-muted-foreground">
-            {t("air_quality", "Air Quality")}
-          </span>
-          <p className="text-lg font-bold mt-1">
-            {aqiVal} <span className="text-xs font-normal text-muted-foreground">({aqiCategoryStr})</span>
-          </p>
-        </div>
-      </section>
-
-      {/* 9. SUNRISE & SUNSET */}
-      <section className="grid grid-cols-2 gap-2.5">
-        <div className="p-3.5 rounded-2xl bg-card border border-border/70 shadow-xs flex items-center gap-3">
-          <span className="text-2xl">🌅</span>
-          <div>
-            <span className="text-xs font-semibold text-muted-foreground">
-              {t("sunrise", "Sunrise")}
-            </span>
-            <p className="text-sm font-bold mt-0.5">{w.sun.sunrise}</p>
-          </div>
-        </div>
-
-        <div className="p-3.5 rounded-2xl bg-card border border-border/70 shadow-xs flex items-center gap-3">
-          <span className="text-2xl">🌇</span>
-          <div>
-            <span className="text-xs font-semibold text-muted-foreground">
-              {t("sunset", "Sunset")}
-            </span>
-            <p className="text-sm font-bold mt-0.5">{w.sun.sunset}</p>
-          </div>
-        </div>
-      </section>
-
-      {/* AI GALLERY MODAL */}
+           {/* AI GALLERY MODAL */}
       <AiGalleryModal
         open={galleryOpen}
         isOpen={galleryOpen}
