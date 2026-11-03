@@ -757,28 +757,141 @@ export const WeatherView: React.FC<WeatherViewProps> = ({
         </div>
       </section>
 
-      {/* 4. CURRENT CONDITIONS DETAILS CARD */}
-      <section className="p-3.5 px-4 rounded-2xl bg-card border border-border/70 shadow-xs text-card-foreground flex items-center justify-between flex-wrap gap-2 text-xs">
-        <div className="flex items-center gap-2">
-          <span className="font-bold text-sm text-foreground">
-            {conditionLabel}
-          </span>
-          <span className="text-muted-foreground">•</span>
-          <span className="font-medium text-muted-foreground">
-            {dayLabel}
-          </span>
-        </div>
+          {/* 4. CURRENT CONDITIONS DETAILS CARD (All Basic Weather Info) */}
+      <section className="p-4 rounded-2xl bg-card border border-border/70 shadow-xs text-card-foreground space-y-3">
+        {/* Top Header Row: Condition, Day/Night, High/Low, and Last Updated */}
+        <div className="flex items-center justify-between flex-wrap gap-2 border-b border-border/50 pb-2.5">
+          <div className="flex items-center gap-2">
+            <span className="font-bold text-base text-foreground">
+              {conditionLabel}
+            </span>
+            <span className="text-muted-foreground">•</span>
+            <span className="font-medium text-xs text-muted-foreground">
+              {dayLabel}
+            </span>
+            {w.daily?.[0] && (
+              <>
+                <span className="text-muted-foreground">•</span>
+                <span className="text-xs font-semibold text-foreground">
+                  H: {Math.round(w.daily[0].max)}° <span className="text-muted-foreground font-normal">/</span> L: {Math.round(w.daily[0].min)}°
+                </span>
+              </>
+            )}
+          </div>
 
-        <div className="flex items-center gap-3">
-          <span className="font-semibold text-foreground">
-            {t("feels_like", "Feels like")} {feelsVal}{tempUnitStr}
-          </span>
-          <span className="text-muted-foreground">•</span>
           <span className="text-muted-foreground text-[11px]">
             {formatTimeAgo(w.fetchedAt, t)}
           </span>
         </div>
+
+        {/* Basic Weather Info Grid (8 Key Metrics) */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-xs">
+          {/* Feels Like */}
+          <div className="p-2.5 rounded-xl bg-muted/40 border border-border/40 flex items-center gap-2.5">
+            <span className="text-lg">🌡️</span>
+            <div>
+              <span className="text-[11px] font-medium text-muted-foreground block">
+                {t("feels_like", "Feels Like")}
+              </span>
+              <span className="text-sm font-bold text-foreground">
+                {feelsVal}{tempUnitStr}
+              </span>
+            </div>
+          </div>
+
+          {/* Humidity */}
+          <div className="p-2.5 rounded-xl bg-muted/40 border border-border/40 flex items-center gap-2.5">
+            <span className="text-lg">💧</span>
+            <div>
+              <span className="text-[11px] font-medium text-muted-foreground block">
+                {t("humidity", "Humidity")}
+              </span>
+              <span className="text-sm font-bold text-foreground">
+                {w.current.humidity}%
+              </span>
+            </div>
+          </div>
+
+          {/* Wind Speed */}
+          <div className="p-2.5 rounded-xl bg-muted/40 border border-border/40 flex items-center gap-2.5">
+            <span className="text-lg">💨</span>
+            <div>
+              <span className="text-[11px] font-medium text-muted-foreground block">
+                {t("wind", "Wind")}
+              </span>
+              <span className="text-sm font-bold text-foreground">
+                {Math.round(w.current.wind)} <span className="text-[11px] font-normal text-muted-foreground">{speedUnitStr}</span>
+              </span>
+            </div>
+          </div>
+
+          {/* Rain / Precip Probability */}
+          <div className="p-2.5 rounded-xl bg-muted/40 border border-border/40 flex items-center gap-2.5">
+            <span className="text-lg">🌧️</span>
+            <div>
+              <span className="text-[11px] font-medium text-muted-foreground block">
+                {t("rain_chance", "Rain Chance")}
+              </span>
+              <span className="text-sm font-bold text-foreground">
+                {w.daily?.[0]?.precipProbMax ?? 0}%
+              </span>
+            </div>
+          </div>
+
+          {/* UV Index */}
+          <div className="p-2.5 rounded-xl bg-muted/40 border border-border/40 flex items-center gap-2.5">
+            <span className="text-lg">☀️</span>
+            <div>
+              <span className="text-[11px] font-medium text-muted-foreground block">
+                {t("uv_index", "UV Index")}
+              </span>
+              <span className="text-sm font-bold text-foreground">
+                {uvVal} <span className="text-[11px] font-normal text-muted-foreground">({uvCategoryStr})</span>
+              </span>
+            </div>
+          </div>
+
+          {/* Air Quality (AQI) */}
+          <div className="p-2.5 rounded-xl bg-muted/40 border border-border/40 flex items-center gap-2.5">
+            <span className="text-lg">🍃</span>
+            <div>
+              <span className="text-[11px] font-medium text-muted-foreground block">
+                {t("air_quality", "Air Quality")}
+              </span>
+              <span className="text-sm font-bold text-foreground">
+                {aqiVal ?? "--"} <span className="text-[11px] font-normal text-muted-foreground">({aqiCategoryStr})</span>
+              </span>
+            </div>
+          </div>
+
+          {/* Sunrise */}
+          <div className="p-2.5 rounded-xl bg-muted/40 border border-border/40 flex items-center gap-2.5">
+            <span className="text-lg">🌅</span>
+            <div>
+              <span className="text-[11px] font-medium text-muted-foreground block">
+                {t("sunrise", "Sunrise")}
+              </span>
+              <span className="text-sm font-bold text-foreground">
+                {w.sun.sunrise}
+              </span>
+            </div>
+          </div>
+
+          {/* Sunset */}
+          <div className="p-2.5 rounded-xl bg-muted/40 border border-border/40 flex items-center gap-2.5">
+            <span className="text-lg">🌇</span>
+            <div>
+              <span className="text-[11px] font-medium text-muted-foreground block">
+                {t("sunset", "Sunset")}
+              </span>
+              <span className="text-sm font-bold text-foreground">
+                {w.sun.sunset}
+              </span>
+            </div>
+          </div>
+        </div>
       </section>
+
 
       {/* 5. WHAT TO WEAR RECOMMENDATION (Expanded with Occasion & Accessories) */}
       <section className="p-4 rounded-2xl bg-card border border-border/70 shadow-xs text-card-foreground space-y-3">
