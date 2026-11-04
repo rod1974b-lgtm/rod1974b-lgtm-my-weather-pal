@@ -501,7 +501,6 @@ export const WeatherView: React.FC<WeatherViewProps> = ({
   const isRaining = code >= 95 || (code >= 51 && code <= 67) || (code >= 80 && code <= 82);
   const isSnowing = (code >= 71 && code <= 77) || (code >= 85 && code <= 86);
   const windKmh = unit === "imperial" ? w.current.wind * 1.60934 : w.current.wind;
-
    // Category-specific clothing advice generator
   const getExpandedClothingAdvice = (): string => {
     if (wearCategory === "business") {
@@ -675,7 +674,7 @@ export const WeatherView: React.FC<WeatherViewProps> = ({
         )}
       </section>
 
-           {/* 2. TOP ACTIONS BAR (Next Art & Favorite) */}
+      {/* 2. TOP ACTIONS BAR (Next Art & Favorite) */}
       <div className="flex items-center justify-between px-1">
         <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
           {w.place.name}
@@ -709,7 +708,7 @@ export const WeatherView: React.FC<WeatherViewProps> = ({
         </div>
       </div>
 
-          {/* 3. STREAMLINED HERO CARD (Only City, Temp, and Weather Icon) */}
+      {/* 3. STREAMLINED HERO CARD (Only City, Temp, and Weather Icon) */}
       <section className="relative overflow-hidden rounded-3xl border border-border/80 p-5 shadow-lg bg-card text-card-foreground min-h-[250px] flex flex-col justify-between">
         {heroBgUrl && (
           <div
@@ -757,7 +756,7 @@ export const WeatherView: React.FC<WeatherViewProps> = ({
         </div>
       </section>
 
-          {/* 4. CURRENT CONDITIONS DETAILS CARD (All Basic Weather Info) */}
+      {/* 4. CURRENT CONDITIONS DETAILS CARD (All Basic Weather Info) */}
       <section className="p-4 rounded-2xl bg-card border border-border/70 shadow-xs text-card-foreground space-y-3">
         {/* Top Header Row: Condition, Day/Night, High/Low, and Last Updated */}
         <div className="flex items-center justify-between flex-wrap gap-2 border-b border-border/50 pb-2.5">
@@ -891,7 +890,6 @@ export const WeatherView: React.FC<WeatherViewProps> = ({
           </div>
         </div>
       </section>
-
 
       {/* 5. WHAT TO WEAR RECOMMENDATION (Expanded with Occasion & Accessories) */}
       <section className="p-4 rounded-2xl bg-card border border-border/70 shadow-xs text-card-foreground space-y-3">
@@ -1052,7 +1050,7 @@ export const WeatherView: React.FC<WeatherViewProps> = ({
         </div>
       </section>
 
-           {/* AI GALLERY MODAL */}
+      {/* AI GALLERY MODAL */}
       <AiGalleryModal
         open={galleryOpen}
         isOpen={galleryOpen}
