@@ -58,6 +58,22 @@ export function AppMenu({ unit, onUnitChange, onOpenAiGallery }: AppMenuProps) {
     } catch {}
   }, [i18n?.language]);
 
+  // Reliable mobile outside-tap listener
+  useEffect(() => {
+    if (!open) return;
+    const handleOutside = (e: MouseEvent | TouchEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleOutside);
+    document.addEventListener("touchstart", handleOutside, { passive: true });
+    return () => {
+      document.removeEventListener("mousedown", handleOutside);
+      document.removeEventListener("touchstart", handleOutside);
+    };
+  }, [open]);
+
   const handleSkyChange = (val: string) => {
     setSkyPref(val);
     try {
@@ -76,11 +92,11 @@ export function AppMenu({ unit, onUnitChange, onOpenAiGallery }: AppMenuProps) {
     } catch {}
   };
 
-  const handleLanguageSelect = async (code: string) => {
+  const handleLanguageSelect = (code: string) => {
     setCurrentLang(code);
     try {
       if (typeof i18n?.changeLanguage === "function") {
-        await i18n.changeLanguage(code);
+        i18n.changeLanguage(code);
       }
       localStorage.setItem("weather:lang", code);
       localStorage.setItem("app_language", code);
@@ -91,10 +107,10 @@ export function AppMenu({ unit, onUnitChange, onOpenAiGallery }: AppMenuProps) {
       window.dispatchEvent(
         new CustomEvent("weather:lang-change", { detail: code })
       );
-      // Brief delay so mobile users see the checkmark, then close menu to reveal translated page
+      // Brief delay so mobile users see the checkmark before menu closes
       setTimeout(() => {
         setOpen(false);
-      }, 180);
+      }, 150);
     } catch (err) {
       console.error("Language switch error:", err);
     }
@@ -110,14 +126,6 @@ export function AppMenu({ unit, onUnitChange, onOpenAiGallery }: AppMenuProps) {
       >
         <span className="text-base select-none">⚙️</span>
       </button>
-
-      {/* Mobile Backdrop Overlay (safely closes menu without eating touch events) */}
-      {open && (
-        <div
-          className="fixed inset-0 z-40 bg-black/30 backdrop-blur-xs sm:bg-transparent"
-          onClick={() => setOpen(false)}
-        />
-      )}
 
       {open && (
         <div className="absolute right-0 top-11 z-50 w-[320px] max-w-[calc(100vw-1.5rem)] rounded-2xl border border-border bg-card/95 p-4 shadow-xl backdrop-blur-md space-y-4 max-h-[85vh] overflow-y-auto">
@@ -207,7 +215,7 @@ export function AppMenu({ unit, onUnitChange, onOpenAiGallery }: AppMenuProps) {
             </div>
           </div>
 
-          {/* Languages (Touch-Optimized for Mobile & PC) */}
+          {/* Languages (Instant Touch & Click for Mobile & PC) */}
           <div>
             <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block mb-1.5">
               {t("language", "Language")}
@@ -222,6 +230,11 @@ export function AppMenu({ unit, onUnitChange, onOpenAiGallery }: AppMenuProps) {
                     key={lang.code}
                     type="button"
                     onClick={() => handleLanguageSelect(lang.code)}
+                    onTouchEnd={(e) => {
+                      e.preventDefault();
+                      handleLanguageSelect(lang.code);
+                    }}
+                    style={{ touchAction: "manipulation" }}
                     className={`flex items-center gap-2 px-2.5 py-2 rounded-lg text-xs transition text-left cursor-pointer border active:scale-95 ${
                       isActive
                         ? "bg-primary text-primary-foreground border-primary font-semibold shadow-xs"
