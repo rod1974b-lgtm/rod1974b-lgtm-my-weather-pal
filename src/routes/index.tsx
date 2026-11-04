@@ -440,7 +440,7 @@ function Index() {
   };
 
   // Derived Sky Theme
-  const activeSky = skyPref === "auto" ? (weather ? skyKey(weather) : "day") : skyPref;
+  const activeSky = skyPref === "auto" ? (weather ? skyKey(weather.current.code, weather.current.is_day) : "day") : skyPref;
 
   return (
     <div
