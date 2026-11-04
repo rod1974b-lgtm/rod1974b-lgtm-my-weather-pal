@@ -8,6 +8,7 @@ import {
   getAllAvailableArtworks,
   getCityWeatherBackground,
 } from "@/lib/aiWatercolorGenerator";
+import { AiGalleryModal } from "@/components/AiGalleryModal";
 
 export interface TickerAlertItem {
   id: string;
@@ -19,6 +20,7 @@ export interface TickerAlertItem {
   source?: string;
   headline?: string;
   urgency?: string;
+  timeAgo?: string;
 }
 
 interface WeatherViewProps {
@@ -43,41 +45,48 @@ const WMO_KEY_MAP: Record<number, { key: string; fallback: string }> = {
   0: { key: "cond_clear", fallback: "Clear sky" },
   1: { key: "cond_partly_cloudy", fallback: "Partly cloudy" },
   2: { key: "cond_partly_cloudy", fallback: "Partly cloudy" },
-  3: { key: "cond_cloudy", fallback: "Overcast" },
+  3: { key: "cond_overcast", fallback: "Overcast" },
   45: { key: "cond_fog", fallback: "Fog" },
-  48: { key: "cond_fog", fallback: "Depositing rime fog" },
-  51: { key: "cond_rain", fallback: "Light drizzle" },
-  53: { key: "cond_rain", fallback: "Moderate drizzle" },
-  55: { key: "cond_rain", fallback: "Dense drizzle" },
-  61: { key: "cond_rain", fallback: "Slight rain" },
-  63: { key: "cond_rain", fallback: "Moderate rain" },
+  48: { key: "cond_fog", fallback: "Fog" },
+  51: { key: "cond_drizzle", fallback: "Drizzle" },
+  53: { key: "cond_drizzle", fallback: "Drizzle" },
+  55: { key: "cond_drizzle", fallback: "Drizzle" },
+  56: { key: "cond_drizzle", fallback: "Drizzle" },
+  57: { key: "cond_drizzle", fallback: "Drizzle" },
+  61: { key: "cond_rain", fallback: "Rain" },
+  63: { key: "cond_rain", fallback: "Rain" },
   65: { key: "cond_heavy_rain", fallback: "Heavy rain" },
-  71: { key: "cond_snow", fallback: "Slight snow" },
-  73: { key: "cond_snow", fallback: "Moderate snow" },
-  75: { key: "cond_heavy_snow", fallback: "Heavy snow" },
-  80: { key: "cond_rain", fallback: "Slight rain showers" },
-  81: { key: "cond_rain", fallback: "Moderate rain showers" },
-  82: { key: "cond_heavy_rain", fallback: "Violent rain showers" },
-  95: { key: "cond_storm", fallback: "Thunderstorm" },
-  96: { key: "cond_storm", fallback: "Thunderstorm with slight hail" },
-  99: { key: "cond_storm", fallback: "Thunderstorm with heavy hail" },
+  66: { key: "cond_heavy_rain", fallback: "Freezing rain" },
+  67: { key: "cond_heavy_rain", fallback: "Heavy freezing rain" },
+  71: { key: "cond_snow", fallback: "Snow" },
+  73: { key: "cond_snow", fallback: "Snow" },
+  75: { key: "cond_snow", fallback: "Heavy snow" },
+  77: { key: "cond_snow", fallback: "Snow grains" },
+  80: { key: "cond_showers", fallback: "Showers" },
+  81: { key: "cond_showers", fallback: "Showers" },
+  82: { key: "cond_showers", fallback: "Heavy showers" },
+  85: { key: "cond_snow_showers", fallback: "Snow showers" },
+  86: { key: "cond_snow_showers", fallback: "Heavy snow showers" },
+  95: { key: "cond_thunderstorm", fallback: "Thunderstorm" },
+  96: { key: "cond_thunderstorm", fallback: "Thunderstorm with hail" },
+  99: { key: "cond_thunderstorm", fallback: "Severe thunderstorm" },
 };
 
 function getConditionLabel(code: number, t: TFunction): string {
   const item = WMO_KEY_MAP[code];
-  if (!item) return t("cond_cloudy", "Cloudy");
-  return t(item.key, item.fallback);
+  if (item) return t(item.key, item.fallback);
+  if (code <= 2) return t("cond_partly_cloudy", "Partly cloudy");
+  if (code === 3) return t("cond_overcast", "Overcast");
+  if (code <= 48) return t("cond_fog", "Fog");
+  if (code <= 57) return t("cond_drizzle", "Drizzle");
+  if (code <= 67) return t("cond_rain", "Rain");
+  if (code <= 77) return t("cond_snow", "Snow");
+  if (code <= 82) return t("cond_showers", "Showers");
+  if (code <= 86) return t("cond_snow_showers", "Snow showers");
+  return t("cond_thunderstorm", "Thunderstorm");
 }
 
-function getAqiDescription(aqi: number, t: TFunction): string {
-  if (aqi <= 50) return t("aqi_good", "Good");
-  if (aqi <= 100) return t("aqi_moderate", "Moderate");
-  if (aqi <= 150) return t("aqi_sensitive", "Sensitive");
-  if (aqi <= 200) return t("aqi_unhealthy", "Unhealthy");
-  return t("aqi_hazardous", "Hazardous");
-}
-
-function getUvDescription(uv: number, t: TFunction): string {
+function getUvLabel(uv: number, t: TFunction): string {
   if (uv <= 2) return t("uv_low", "Low");
   if (uv <= 5) return t("uv_moderate", "Moderate");
   if (uv <= 7) return t("uv_high", "High");
@@ -85,237 +94,223 @@ function getUvDescription(uv: number, t: TFunction): string {
   return t("uv_extreme", "Extreme");
 }
 
+function getAqiLabel(aqi: number | undefined, t: TFunction): string {
+  if (aqi === undefined) return "—";
+  if (aqi <= 50) return t("aqi_good", "Good");
+  if (aqi <= 100) return t("aqi_moderate", "Moderate");
+  if (aqi <= 150) return t("aqi_sensitive", "Sensitive");
+  if (aqi <= 200) return t("aqi_unhealthy", "Unhealthy");
+  if (aqi <= 300) return t("aqi_very_unhealthy", "Very Unhealthy");
+  return t("aqi_unhealthy", "Hazardous");
+}
+
+function formatTimeAgo(timestamp: number, t: TFunction): string {
+  if (!timestamp) return t("updated_now", "Updated just now");
+  const diffSec = Math.floor((Date.now() - timestamp) / 1000);
+  if (diffSec < 60) return t("updated_now", "Updated just now");
+  const diffMin = Math.floor(diffSec / 60);
+  if (diffMin < 60) return `${diffMin}m ${t("ago", "ago")}`;
+  const diffHours = Math.floor(diffMin / 60);
+  return `${diffHours}h ${t("ago", "ago")}`;
+}
+
 const DAY_LABELS: Record<string, string> = {
-  en: "Day",
-  th: "กลางวัน",
-  es: "Día",
-  ja: "昼",
-  zh: "白天",
-  fr: "Jour",
-  de: "Tag",
-  pt: "Dia",
-  ru: "День",
-  ar: "نهار",
-  ko: "낮",
-  id: "Siang",
-  vi: "Ngày",
-  hi: "दिन",
+  en: "Day", th: "กลางวัน", es: "Día", ja: "昼", zh: "白天", hi: "दिन",
+  fr: "Jour", de: "Tag", pt: "Dia", ru: "День", ar: "نهار", ko: "낮", id: "Siang", vi: "Ngày",
 };
 
 const NIGHT_LABELS: Record<string, string> = {
-  en: "Night",
-  th: "กลางคืน",
-  es: "Noche",
-  ja: "夜",
-  zh: "夜晚",
-  fr: "Nuit",
-  de: "Nacht",
-  pt: "Noite",
-  ru: "Ночь",
-  ar: "ليل",
-  ko: "밤",
-  id: "Malam",
-  vi: "Đêm",
-  hi: "रात",
+  en: "Night", th: "กลางคืน", es: "Noche", ja: "夜", zh: "夜晚", hi: "रात",
+  fr: "Nuit", de: "Nacht", pt: "Noite", ru: "Ночь", ar: "ليل", ko: "밤", id: "Malam", vi: "Đêm",
+};
+
+const SPEED_UNITS = {
+  en: { imperial: "mph", metric: "km/h" },
+  th: { imperial: "ไมล์/ชม.", metric: "กม./ชม." },
+  es: { imperial: "mph", metric: "km/h" },
+  ja: { imperial: "mph", metric: "km/h" },
+  zh: { imperial: "英里/小时", metric: "公里/小时" },
+  hi: { imperial: "मील/घंटे", metric: "किमी/घंटे" },
+  fr: { imperial: "mph", metric: "km/h" },
+  de: { imperial: "mph", metric: "km/h" },
+  pt: { imperial: "mph", metric: "km/h" },
+  ru: { imperial: "миль/ч", metric: "км/ч" },
+  ar: { imperial: "ميل/س", metric: "كم/س" },
+  ko: { imperial: "mph", metric: "km/h" },
+  id: { imperial: "mph", metric: "km/jam" },
+  vi: { imperial: "dặm/h", metric: "km/h" },
 };
 
 const WEAR_CATEGORIES = {
   en: { casual: "Casual", business: "Business", sports: "Sports" },
-  th: { casual: "ลำลอง", business: "ทำงาน", sports: "กีฬา" },
+  th: { casual: "ทั่วไป", business: "ทำงาน", sports: "ออกกำลังกาย" },
   es: { casual: "Casual", business: "Negocios", sports: "Deporte" },
   ja: { casual: "カジュアル", business: "ビジネス", sports: "スポーツ" },
-  zh: { casual: "休闲", business: "商务", sports: "运动" },
-  fr: { casual: "Décontracté", business: "Affaires", sports: "Sport" },
+  zh: { casual: "休闲日常", business: "商务通勤", sports: "运动健身" },
+  hi: { casual: "कैज़ुअल", business: "कार्यालय", sports: "खेलकूद" },
+  fr: { casual: "Décontracté", business: "Professionnel", sports: "Sport" },
   de: { casual: "Freizeit", business: "Business", sports: "Sport" },
   pt: { casual: "Casual", business: "Trabalho", sports: "Esporte" },
   ru: { casual: "Повседневный", business: "Деловой", sports: "Спорт" },
-  ar: { casual: "كاجوال", business: "عمل", sports: "رياضة" },
-  ko: { casual: "캐주얼", business: "비즈니스", sports: "스포츠" },
-  id: { casual: "Santai", business: "Bisnis", sports: "Olahraga" },
-  vi: { casual: "Thường ngày", business: "Công sở", sports: "Thể thao" },
-  hi: { casual: "कैजुअल", business: "व्यावसायिक", sports: "खेल" },
+  ar: { casual: "يومي", business: "عمل", sports: "رياضة" },
+  ko: { casual: "캐주얼", business: "비즈니스", sports: "운동/스포츠" },
+  id: { casual: "Santai", business: "Kantor", sports: "Olahraga" },
+  vi: { casual: "Hàng ngày", business: "Công sở", sports: "Thể thao" },
 };
 
 const ACCESSORY_LABELS = {
   en: {
     umbrella: "Umbrella",
     sunglasses: "Sunglasses",
-    spf: "Sunscreen SPF",
-    mask: "Air Mask (AQI)",
-    scarf_gloves: "Scarf & Gloves",
-    water: "Stay Hydrated",
-    windbreaker: "Windbreaker",
+    sunscreen: "SPF 30+",
+    mask: "Mask (AQI)",
+    scarf: "Scarf & Gloves",
+    water: "Hydration",
+    windbreaker: "Wind Shell",
+    evening_drop: "Evening chill: drops to",
   },
   th: {
     umbrella: "พกร่ม",
     sunglasses: "แว่นกันแดด",
-    spf: "ทากันแดด SPF",
-    mask: "หน้ากากกรองฝุ่น",
-    scarf_gloves: "ผ้าพันคอ/ถุงมือ",
-    water: "จิบน้ำสม่ำเสมอ",
+    sunscreen: "ทากันแดด",
+    mask: "หน้ากากอนามัย",
+    scarf: "ผ้าพันคอ/ถุงมือ",
+    water: "จิบน้ำบ่อยๆ",
     windbreaker: "เสื้อกันลม",
+    evening_drop: "ค่ำนี้อากาศเย็นลงเหลือ",
   },
   es: {
     umbrella: "Paraguas",
     sunglasses: "Gafas de sol",
-    spf: "Protector SPF",
-    mask: "Mascarilla (AQI)",
-    scarf_gloves: "Bufanda y guantes",
-    water: "Hidratación",
+    sunscreen: "Protector solar",
+    mask: "Mascarilla",
+    scarf: "Bufanda y guantes",
+    water: "Agua extra",
     windbreaker: "Cortavientos",
+    evening_drop: "Enfriamiento nocturno: baja a",
   },
   ja: {
     umbrella: "雨傘",
     sunglasses: "サングラス",
-    spf: "日焼け止め",
-    mask: "マスク (AQI)",
-    scarf_gloves: "マフラー・手袋",
+    sunscreen: "日焼け止め",
+    mask: "マスク着用",
+    scarf: "手袋・マフラー",
     water: "水分補給",
-    windbreaker: "ウインドブレーカー",
+    windbreaker: "防風ウェア",
+    evening_drop: "夜間の冷え込み:",
   },
   zh: {
-    umbrella: "雨伞",
-    sunglasses: "太阳镜",
-    spf: "防晒霜",
-    mask: "口罩 (AQI)",
-    scarf_gloves: "围巾和手套",
-    water: "多喝水",
-    windbreaker: "防风衣",
+    umbrella: "带雨伞",
+    sunglasses: "佩戴墨镜",
+    sunscreen: "涂抹防晒",
+    mask: "防尘口罩",
+    scarf: "围巾手套",
+    water: "多补充水分",
+    windbreaker: "防风外套",
+    evening_drop: "傍晚降温至",
   },
   fr: {
     umbrella: "Parapluie",
     sunglasses: "Lunettes de soleil",
-    spf: "Crème solaire",
-    mask: "Masque (AQI)",
-    scarf_gloves: "Écharpe et gants",
+    sunscreen: "Crème solaire",
+    mask: "Masque",
+    scarf: "Écharpe et gants",
     water: "Hydratation",
     windbreaker: "Coupe-vent",
+    evening_drop: "Baisse nocturne : descend à",
   },
   de: {
     umbrella: "Regenschirm",
     sunglasses: "Sonnenbrille",
-    spf: "Sonnencreme",
-    mask: "Maske (AQI)",
-    scarf_gloves: "Schal & Handschuhe",
+    sunscreen: "Sonnencreme",
+    mask: "Schutzmaske",
+    scarf: "Schal & Handschuhe",
     water: "Viel trinken",
     windbreaker: "Windjacke",
+    evening_drop: "Abendkühle: sinkt auf",
   },
   pt: {
     umbrella: "Guarda-chuva",
-    sunglasses: "Óculos de sol",
-    spf: "Protetor solar",
-    mask: "Máscara (AQI)",
-    scarf_gloves: "Cachecol e luvas",
+    sunglasses: "Óculos escuros",
+    sunscreen: "Protetor solar",
+    mask: "Máscara",
+    scarf: "Cachecol e luvas",
     water: "Hidratação",
     windbreaker: "Corta-vento",
+    evening_drop: "Queda à noite: desce para",
   },
   ru: {
     umbrella: "Зонт",
-    sunglasses: "Солнечные очки",
-    spf: "Крем SPF",
-    mask: "Маска (AQI)",
-    scarf_gloves: "Шарф и перчатки",
-    water: "Пейте воду",
+    sunglasses: "Солнцезащитные очки",
+    sunscreen: "Защита от солнца",
+    mask: "Маска",
+    scarf: "Шарฟ и перчатки",
+    water: "Больше воды",
     windbreaker: "Ветровка",
+    evening_drop: "Вечернее похолодание: до",
   },
   ar: {
     umbrella: "مظلة",
     sunglasses: "نظارة شمسية",
-    spf: "واقي شمس",
-    mask: "كمامة (AQI)",
-    scarf_gloves: "وشاح وقفازات",
+    sunscreen: "واقي شمس",
+    mask: "كمامة",
+    scarf: "وشاح وقفازات",
     water: "شرب الماء",
     windbreaker: "سترة واقية",
+    evening_drop: "انخفاض مسائي: يصل إلى",
   },
   ko: {
-    umbrella: "우산",
+    umbrella: "우산 챙기기",
     sunglasses: "선글라스",
-    spf: "선크림",
-    mask: "마스크 (AQI)",
-    scarf_gloves: "목도리 및 장갑",
-    water: "수분 섭취",
+    sunscreen: "자외선 차단제",
+    mask: "마스크 권장",
+    scarf: "목도리와 장갑",
+    water: "수분 보충",
     windbreaker: "바람막이",
+    evening_drop: "저녁 기온 하강:",
   },
   id: {
-    umbrella: "Payung",
-    sunglasses: "Kacamata hitam",
-    spf: "Tabir surya",
-    mask: "Masker (AQI)",
-    scarf_gloves: "Syal & Sarung tangan",
-    water: "Minum air",
-    windbreaker: "Jaket angin",
+    umbrella: "Bawa Payung",
+    sunglasses: "Kacamata Hitam",
+    sunscreen: "Tabir Surya",
+    mask: "Masker",
+    scarf: "Syal & Sarung Tangan",
+    water: "Banyak Minum",
+    windbreaker: "Jaket Angin",
+    evening_drop: "Malam mendingin hingga",
   },
   vi: {
-    umbrella: "Mang ô",
+    umbrella: "Mang theo ô",
     sunglasses: "Kính râm",
-    spf: "Kem chống nắng",
-    mask: "Khẩu trang (AQI)",
-    scarf_gloves: "Khăn & Găng tay",
-    water: "Uống nước",
+    sunscreen: "Kem chống nắng",
+    mask: "Khẩu trang",
+    scarf: "Khăn & găng tay",
+    water: "Bổ sung nước",
     windbreaker: "Áo gió",
+    evening_drop: "Tối se lạnh giảm còn",
   },
   hi: {
-    umbrella: "छाता",
+    umbrella: "छाता रखें",
     sunglasses: "धूप का चश्मा",
-    spf: "सनस्क्रीन",
-    mask: "मास्क (AQI)",
-    scarf_gloves: "मफलर और दस्ताने",
+    sunscreen: "सनस्क्रीन",
+    mask: "मास्क",
+    scarf: "मफलर और दस्ताने",
     water: "पानी पिएं",
     windbreaker: "विंडचीटर",
+    evening_drop: "शाम को तापमान गिरेगा:",
   },
 };
 
-function formatLocalizedHour(timeStr: string, locale: string): string {
-  try {
-    const d = new Date(timeStr);
-    if (!isNaN(d.getTime())) {
-      return d.toLocaleTimeString(locale, { hour: "numeric" });
-    }
-  } catch {}
-  const match = timeStr.match(/(\d{1,2}):\d{2}/);
-  if (match) {
-    const h = parseInt(match[1], 10);
-    return `${h}:00`;
-  }
-  return timeStr;
-}
-
-function formatLocalizedWeekday(dateStr: string, locale: string): string {
-  try {
-    const [year, month, day] = dateStr.split("-").map(Number);
-    if (year && month && day) {
-      const d = new Date(year, month - 1, day);
-      if (!isNaN(d.getTime())) {
-        return d.toLocaleDateString(locale, { weekday: "short" });
-      }
-    }
-    const fallbackDate = new Date(dateStr);
-    if (!isNaN(fallbackDate.getTime())) {
-      return fallbackDate.toLocaleDateString(locale, { weekday: "short" });
-    }
-  } catch {}
-  return dateStr;
-}
-
-function formatTime(isoStr?: string): string {
-  if (!isoStr) return "--:--";
-  const m = isoStr.match(/T(\d{1,2}:\d{2})/);
-  if (m) return m[1];
-  const parts = isoStr.split(" ");
-  if (parts[1]) return parts[1].slice(0, 5);
-  return isoStr.slice(0, 5);
-}
-
-function formatLastUpdated(date: Date, locale: string): string {
-  try {
-    return date.toLocaleTimeString(locale, {
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-  } catch {
-    return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-  }
-}
+const TAG_TRANSLATION_MAP: Record<string, string> = {
+  "TMD Alert": "alert_thunderstorm_tag",
+  "TMD Warning": "alert_thunderstorm_tag",
+  "Earthquake": "alert_earthquake_tag",
+  "Earthquake Alert": "alert_earthquake_tag",
+  "Flood Watch": "alert_flood_tag",
+  "NWS Alert": "alert_hazard",
+  "Air Quality": "air_quality",
+  "Marine Warning": "alert_advisory",
+};
 
 export const WeatherView: React.FC<WeatherViewProps> = ({
   weather,
@@ -335,15 +330,15 @@ export const WeatherView: React.FC<WeatherViewProps> = ({
   const lang = i18n?.language?.toLowerCase().split("-")[0] || "en";
   const w = weather || weatherProp;
 
+  const [galleryOpen, setGalleryOpen] = useState(false);
   const [heroBgUrl, setHeroBgUrl] = useState<string>("");
   const [artIndex, setArtIndex] = useState(0);
   const [isDarkArtwork, setIsDarkArtwork] = useState<boolean>(false);
-  const [isPaused, setIsPaused] = useState(false);
-  const [lastUpdatedTime, setLastUpdatedTime] = useState<string>("");
 
+  // Clothing category selection with persistence
   const [wearCategory, setWearCategory] = useState<WearCategory>(() => {
     try {
-      const saved = localStorage.getItem("weather:wear-category");
+      const saved = localStorage.getItem("weather:wear-category") as WearCategory;
       if (saved === "business" || saved === "sports" || saved === "casual") {
         return saved;
       }
@@ -351,31 +346,94 @@ export const WeatherView: React.FC<WeatherViewProps> = ({
     return "casual";
   });
 
-  const handleWearCategoryChange = (cat: WearCategory) => {
+  const handleSelectCategory = (cat: WearCategory) => {
     setWearCategory(cat);
     try {
       localStorage.setItem("weather:wear-category", cat);
     } catch {}
   };
 
-  useEffect(() => {
-    setLastUpdatedTime(formatLastUpdated(new Date(), lang));
-  }, [w?.current.temp, lang]);
+  const cityStorageKey = w?.place?.name
+    ? `weather:custom-bg:${w.place.name.toLowerCase().trim()}`
+    : "";
 
+  // Auto-detect whether the hero background picture is dark or light
   useEffect(() => {
-    if (!w) return;
-    const cityKey = w.place.name.toLowerCase().trim();
-    const storedChoice =
-      localStorage.getItem(`weather:custom-art:${cityKey}`) ||
-      localStorage.getItem(`weather:custom-bg:${cityKey}`);
-
-    if (storedChoice) {
-      setHeroBgUrl(storedChoice);
+    if (!heroBgUrl) {
+      setIsDarkArtwork(!w?.current?.is_day);
       return;
     }
 
+    let active = true;
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.referrerPolicy = "no-referrer";
+    img.src = heroBgUrl;
+
+    img.onload = () => {
+      if (!active) return;
+      try {
+        const canvas = document.createElement("canvas");
+        canvas.width = 16;
+        canvas.height = 16;
+        const ctx = canvas.getContext("2d", { willReadFrequently: true });
+        if (!ctx) return;
+        ctx.drawImage(img, 0, 0, 16, 16);
+        const data = ctx.getImageData(0, 0, 16, 16).data;
+        let totalLum = 0;
+        let count = 0;
+        for (let i = 0; i < data.length; i += 4) {
+          const r = data[i]!;
+          const g = data[i + 1]!;
+          const b = data[i + 2]!;
+          totalLum += 0.299 * r + 0.587 * g + 0.114 * b;
+          count++;
+        }
+        const avgLum = totalLum / count;
+        setIsDarkArtwork(avgLum < 135);
+      } catch {
+        setIsDarkArtwork(!w?.current?.is_day);
+      }
+    };
+
+    img.onerror = () => {
+      if (!active) return;
+      setIsDarkArtwork(!w?.current?.is_day);
+    };
+
+    return () => {
+      active = false;
+    };
+  }, [heroBgUrl, w?.current?.is_day]);
+
+  const handleSelectBackground = (url: string) => {
+    setHeroBgUrl(url);
+    if (cityStorageKey) {
+      try {
+        if (url) {
+          localStorage.setItem(cityStorageKey, url);
+        } else {
+          localStorage.removeItem(cityStorageKey);
+        }
+      } catch {}
+    }
+    if (onSelectBg) onSelectBg(url);
+    if (onSelectBackground) onSelectBackground(url);
+  };
+
+  useEffect(() => {
+    if (!w?.place) return;
+
+    try {
+      const savedCityBg = localStorage.getItem(cityStorageKey);
+      if (savedCityBg) {
+        setHeroBgUrl(savedCityBg);
+        return;
+      }
+    } catch {}
+
     const conditionStr = getConditionLabel(w.current.code, t);
-    const bg = getCityWeatherBackground(
+    const arts = getAllAvailableArtworks(
       w.place.name,
       w.current.code,
       conditionStr,
@@ -383,81 +441,52 @@ export const WeatherView: React.FC<WeatherViewProps> = ({
       w.place.lat,
       w.place.lon
     );
-    setHeroBgUrl(bg);
-  }, [w?.place.name, w?.current.code, t]);
 
-  useEffect(() => {
-    const handleBgChange = (e: Event) => {
-      const customEvent = e as CustomEvent<{ city?: string; url?: string }>;
-      if (
-        !customEvent.detail?.city ||
-        customEvent.detail.city.toLowerCase() === w?.place.name.toLowerCase().trim()
-      ) {
-        if (customEvent.detail?.url) {
-          setHeroBgUrl(customEvent.detail.url);
+    const firstArt = arts[0];
+    if (firstArt) {
+      setHeroBgUrl(firstArt);
+    } else {
+      getCityWeatherBackground(
+        w.place.name,
+        conditionStr,
+        w.current.code,
+        w.current.temp,
+        (loadedUrl) => {
+          setHeroBgUrl(loadedUrl);
+        },
+        w.place.country,
+        w.place.lat,
+        w.place.lon
+      ).then((res) => {
+        if (res?.initialBg && !res.initialBg.startsWith("linear-gradient")) {
+          setHeroBgUrl(res.initialBg);
         }
-      }
-    };
-    window.addEventListener("weather:custom-bg-change", handleBgChange);
-    return () => window.removeEventListener("weather:custom-bg-change", handleBgChange);
-  }, [w?.place.name]);
+      }).catch(() => {});
+    }
+  }, [w?.place?.name, w?.current?.code, cityStorageKey]);
 
-  useEffect(() => {
-    if (!heroBgUrl) return;
-    let isMounted = true;
-    const img = new Image();
-    img.crossOrigin = "anonymous";
-    img.src = heroBgUrl;
+  if (!w) {
+    return (
+      <div className="flex flex-col items-center justify-center p-8 text-center text-muted-foreground animate-pulse">
+        <p className="text-sm">{t("search_placeholder", "Loading local weather...")}</p>
+      </div>
+    );
+  }
 
-    img.onload = () => {
-      if (!isMounted) return;
-      try {
-        const canvas = document.createElement("canvas");
-        canvas.width = 16;
-        canvas.height = 16;
-        const ctx = canvas.getContext("2d");
-        if (!ctx) return;
-        ctx.drawImage(img, 0, 0, 16, 16);
-        const data = ctx.getImageData(0, 0, 16, 16).data;
-        let totalBrightness = 0;
-        const pixelCount = data.length / 4;
-        for (let i = 0; i < data.length; i += 4) {
-          const r = data[i];
-          const g = data[i + 1];
-          const b = data[i + 2];
-          totalBrightness += 0.299 * r + 0.587 * g + 0.114 * b;
-        }
-        const avgBrightness = totalBrightness / pixelCount;
-        setIsDarkArtwork(avgBrightness < 135);
-      } catch {
-        setIsDarkArtwork(false);
-      }
-    };
-    img.onerror = () => {
-      if (isMounted) setIsDarkArtwork(false);
-    };
-    return () => {
-      isMounted = false;
-    };
-  }, [heroBgUrl]);
+  const tempVal = Math.round(w.current.temp);
+  const feelsVal = Math.round(w.current.feels);
+  const conditionLabel = getConditionLabel(w.current.code, t);
+  const tempUnitStr = unit === "imperial" ? "°F" : "°C";
 
-  if (!w) return null;
+  const speedUnits =
+    SPEED_UNITS[lang as keyof typeof SPEED_UNITS] || SPEED_UNITS.en;
+  const speedUnitStr = unit === "imperial" ? speedUnits.imperial : speedUnits.metric;
 
-  const tempUnit = unit === "imperial" ? "°F" : "°C";
-  const windUnit = unit === "imperial" ? "mph" : "km/h";
+  const uvVal = w.current.uvIndex;
+  const uvCategoryStr = getUvLabel(uvVal, t);
 
-  const conditionText = getConditionLabel(w.current.code, t);
-  const feelsLike = Math.round(w.current.feels_like);
-  const aqiValue = Math.round(w.current.aqi ?? 32);
-  const uvValue = Math.round(w.current.uv ?? 0);
-  const rainChance = Math.round(
-    w.daily?.[0]?.rain_chance ??
-      w.hourly?.[0]?.rain_chance ??
-      w.hourly?.[0]?.pop ??
-      0
-  );
-  const sunriseTime = formatTime(w.daily?.[0]?.sunrise);
-  const sunsetTime = formatTime(w.daily?.[0]?.sunset);
+  const aqiVal = w.current.aqi;
+  const aqiCategoryStr = getAqiLabel(aqiVal, t);
 
   const alertsToDisplay = activeAlerts.length > 0 ? activeAlerts : disasters;
   const dayLabel = (w.current.is_day ? DAY_LABELS[lang] : NIGHT_LABELS[lang]) || (w.current.is_day ? "Day" : "Night");
@@ -601,6 +630,14 @@ export const WeatherView: React.FC<WeatherViewProps> = ({
   const tempBadgeClass =
     "inline-flex items-baseline gap-1 text-white drop-shadow-[0_2px_8px_rgba(0,0,0,0.85)]";
 
+  const pillGlassBg = isDarkArtwork
+    ? "bg-black/50 text-white border-white/20"
+    : "bg-white/80 text-slate-800 border-slate-300/60";
+
+  const actionBtnGlassBg = isDarkArtwork
+    ? "bg-black/50 text-white border-white/25 hover:bg-black/65"
+    : "bg-white/85 text-slate-800 border-slate-300/70 hover:bg-white";
+
   return (
     <div className="space-y-4">
       {/* 1. DISASTER & ADVISORY ALERT TICKER */}
@@ -638,7 +675,7 @@ export const WeatherView: React.FC<WeatherViewProps> = ({
         )}
       </section>
 
-      {/* 2. TOP ACTIONS BAR (Next Art, Refresh, and Favorite) */}
+      {/* 2. TOP ACTIONS BAR (Next Art & Favorite) */}
       <div className="flex items-center justify-between px-1">
         <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
           {w.place.name}
@@ -655,20 +692,17 @@ export const WeatherView: React.FC<WeatherViewProps> = ({
             <span>{t("next_art", "Next Art")}</span>
           </button>
 
-          {/* Refresh Weather Button */}
-          {onRefresh && (
-            <button
-              type="button"
-              onClick={onRefresh}
-              disabled={loading}
-              className="flex items-center gap-1.5 rounded-xl border border-border/80 bg-card/85 px-3 py-1.5 text-xs font-semibold text-foreground shadow-xs backdrop-blur-md transition hover:bg-muted cursor-pointer disabled:opacity-50"
-              title={t("refresh", "Refresh Weather")}
-              aria-label={t("refresh", "Refresh Weather")}
-            >
-              <span className={`text-sm inline-block ${loading ? "animate-spin" : ""}`}>🔄</span>
-              <span className="hidden sm:inline">{t("refresh", "Refresh")}</span>
-            </button>
-          )}
+          {/* Refresh Button */}
+          <button
+            type="button"
+            onClick={onRefresh}
+            disabled={loading}
+            className="flex items-center gap-1.5 rounded-xl border border-border/80 bg-card/85 px-3 py-1.5 text-xs font-semibold text-foreground shadow-xs backdrop-blur-md transition hover:bg-muted disabled:opacity-60 cursor-pointer"
+            title={t("refresh", "Refresh")}
+          >
+            <span className={`text-sm ${loading ? "animate-spin" : ""}`}>🔄</span>
+            <span className="hidden sm:inline">{t("refresh", "Refresh")}</span>
+          </button>
 
           {/* Favorite Toggle Button */}
           {onToggleFavorite && (
@@ -1028,6 +1062,19 @@ export const WeatherView: React.FC<WeatherViewProps> = ({
           })}
         </div>
       </section>
+
+      {/* AI GALLERY MODAL */}
+      <AiGalleryModal
+        open={galleryOpen}
+        isOpen={galleryOpen}
+        onClose={() => setGalleryOpen(false)}
+        cityName={w.place.name}
+        weatherCode={w.current.code}
+        currentTemp={w.current.temp}
+        isDay={w.current.is_day}
+        onSelectBg={handleSelectBackground}
+        onSelectBackground={handleSelectBackground}
+      />
     </div>
   );
 };
