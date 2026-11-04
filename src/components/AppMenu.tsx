@@ -1,3 +1,4 @@
+// src/components/AppMenu.tsx
 import { useState, useRef, useEffect } from "react";
 import { Link } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
@@ -10,21 +11,6 @@ interface AppMenuProps {
   onOpenAiGallery?: () => void;
 }
 
-const SKY_PREFS = [
-  { value: "auto", label: "Auto (weather)" },
-  { value: "day", label: "Clear Day" },
-  { value: "night", label: "Clear Night" },
-  { value: "cloudy", label: "Overcast / Cloudy" },
-  { value: "rain", label: "Rain / Storm" },
-  { value: "sunset", label: "Sunset Glow" },
-];
-
-const FONT_SIZES = [
-  { value: "100%", label: "Normal (100%)" },
-  { value: "115%", label: "Large (115%)" },
-  { value: "130%", label: "Huge (130%)" },
-];
-
 export function AppMenu({ unit, onUnitChange, onOpenAiGallery }: AppMenuProps) {
   const { t, i18n } = useTranslation();
   const [open, setOpen] = useState(false);
@@ -34,6 +20,23 @@ export function AppMenu({ unit, onUnitChange, onOpenAiGallery }: AppMenuProps) {
     return i18n?.language?.toLowerCase().split("-")[0] || "en";
   });
   const menuRef = useRef<HTMLDivElement>(null);
+
+  // Dynamic sky presets with translations
+  const skyOptions = [
+    { value: "auto", label: t("sky_auto", "Auto (weather)") },
+    { value: "day", label: t("sky_clear_day", "Clear Day") },
+    { value: "night", label: t("sky_clear_night", "Clear Night") },
+    { value: "cloudy", label: t("sky_cloudy_day", "Overcast / Cloudy") },
+    { value: "rain", label: t("sky_rain", "Rain / Storm") },
+    { value: "sunset", label: t("sunset", "Sunset Glow") },
+  ];
+
+  // Dynamic font size options with translations
+  const fontSizes = [
+    { value: "100%", label: t("font_normal", "Normal (100%)") },
+    { value: "115%", label: t("font_large", "Large (115%)") },
+    { value: "130%", label: t("font_xlarge", "Huge (130%)") },
+  ];
 
   // Restore saved preferences
   useEffect(() => {
@@ -50,7 +53,7 @@ export function AppMenu({ unit, onUnitChange, onOpenAiGallery }: AppMenuProps) {
         localStorage.getItem("app_language") ||
         i18n?.language;
       if (savedLang) {
-        setCurrentLang(savedLang.toLowerCase().split("-")[0]);
+        setCurrentLang(savedLang.toLowerCase().split("-")[0] || "en");
       }
     } catch {}
   }, [i18n?.language]);
@@ -102,7 +105,7 @@ export function AppMenu({ unit, onUnitChange, onOpenAiGallery }: AppMenuProps) {
       <button
         type="button"
         onClick={() => setOpen((prev) => !prev)}
-        aria-label="Settings"
+        aria-label={t("settings", "Settings")}
         className="flex h-9 w-9 items-center justify-center rounded-full border border-border bg-card text-foreground shadow-xs hover:bg-muted transition cursor-pointer"
       >
         <span className="text-base select-none">⚙️</span>
@@ -173,7 +176,7 @@ export function AppMenu({ unit, onUnitChange, onOpenAiGallery }: AppMenuProps) {
               onChange={(e) => handleSkyChange(e.target.value)}
               className="w-full rounded-lg border border-border bg-muted px-3 py-1.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer"
             >
-              {SKY_PREFS.map((s) => (
+              {skyOptions.map((s) => (
                 <option key={s.value} value={s.value} className="bg-card text-foreground">
                   {s.label}
                 </option>
@@ -187,7 +190,7 @@ export function AppMenu({ unit, onUnitChange, onOpenAiGallery }: AppMenuProps) {
               {t("text_size", "Text Size")}
             </label>
             <div className="grid grid-cols-3 gap-1.5">
-              {FONT_SIZES.map((f) => (
+              {fontSizes.map((f) => (
                 <button
                   key={f.value}
                   type="button"
