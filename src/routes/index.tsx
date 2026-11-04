@@ -19,6 +19,12 @@ import {
 } from "@/lib/weather";
 import { WeatherView, type TickerAlertItem } from "@/components/WeatherView";
 import { AppMenu } from "@/components/AppMenu";
+import { RootBeerThankYou } from "@/components/RootBeerThankYou_DEEPER_AMBER";
+import {
+  isAdUnlocked,
+  unlockWithAd24h,
+  getAllUnlockedThankYouBackgrounds,
+} from "@/lib/monetization";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -227,7 +233,29 @@ function Index() {
   const [customBgUrl, setCustomBgUrl] = useState<string | null>(null);
   const [skyPref, setSkyPref] = useState<string>("auto");
 
-  // 1. Initial Preferences
+  // Monetization & Ad Unlock state
+  const [purchasedTierId, setPurchasedTierId] = useState<string | null>(null);
+  const [adUnlockedBgs, setAdUnlockedBgs] = useState<string[]>(() => {
+    if (typeof window === "undefined") return [];
+    const adBgs: string[] = [];
+    try {
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key?.startsWith("ad_unlocked_")) {
+          const bg = key.replace("ad_unlocked_", "");
+          if (isAdUnlocked(bg)) adBgs.push(bg);
+        }
+      }
+    } catch {}
+    return adBgs;
+  });
+
+  const handleAdUnlock = (bgId: string) => {
+    unlockWithAd24h(bgId);
+    setAdUnlockedBgs((prev) => [...prev, bgId]);
+  };
+
+  // 1. Initial Preferences & Listeners
   useEffect(() => {
     setUnit(loadUnitPref());
     setFavorites(loadFavorites());
@@ -244,7 +272,19 @@ function Index() {
       }
     };
     window.addEventListener("weather:sky-change", handleSkyChange);
-    return () => window.removeEventListener("weather:sky-change", handleSkyChange);
+
+    const handleThankYouEvent = (e: Event) => {
+      const customEvent = e as CustomEvent<{ tierId: string }>;
+      if (customEvent.detail?.tierId) {
+        setPurchasedTierId(customEvent.detail.tierId);
+      }
+    };
+    window.addEventListener("weather:trigger-tier-thankyou", handleThankYouEvent);
+
+    return () => {
+      window.removeEventListener("weather:sky-change", handleSkyChange);
+      window.removeEventListener("weather:trigger-tier-thankyou", handleThankYouEvent);
+    };
   }, []);
 
   // 2. Fetch Weather and Disaster Alerts
@@ -440,7 +480,12 @@ function Index() {
   };
 
   // Derived Sky Theme
-  const activeSky = skyPref === "auto" ? (weather ? skyKey(weather.current.code, weather.current.is_day) : "day") : skyPref;
+  const activeSky =
+    skyPref === "auto"
+      ? weather
+        ? skyKey(weather.current.code, weather.current.is_day)
+        : "day"
+      : skyPref;
 
   return (
     <div
@@ -589,6 +634,25 @@ function Index() {
           </Link>
         </div>
       </footer>
+
+      {/* Root Beer Tier Thank-You Overlay */}
+      {purchasedTierId && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="relative w-full max-w-md">
+            <RootBeerThankYou
+              tierId={purchasedTierId as any}
+              onClose={() => setPurchasedTierId(null)}
+            />
+            <button
+              onClick={() => setPurchasedTierId(null)}
+              aria-label="Close"
+              className="absolute -top-3 -right-3 bg-white text-zinc-700 hover:text-black rounded-full w-8 h-8 flex items-center justify-center shadow-lg font-bold text-sm transition hover:scale-105"
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
