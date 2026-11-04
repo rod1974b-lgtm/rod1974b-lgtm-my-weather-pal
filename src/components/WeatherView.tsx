@@ -692,6 +692,18 @@ export const WeatherView: React.FC<WeatherViewProps> = ({
             <span>{t("next_art", "Next Art")}</span>
           </button>
 
+          {/* Refresh Button */}
+          <button
+            type="button"
+            onClick={onRefresh}
+            disabled={loading}
+            className="flex items-center gap-1.5 rounded-xl border border-border/80 bg-card/85 px-3 py-1.5 text-xs font-semibold text-foreground shadow-xs backdrop-blur-md transition hover:bg-muted disabled:opacity-60 cursor-pointer"
+            title={t("refresh", "Refresh")}
+          >
+            <span className={`text-sm ${loading ? "animate-spin" : ""}`}>🔄</span>
+            <span className="hidden sm:inline">{t("refresh", "Refresh")}</span>
+          </button>
+
           {/* Favorite Toggle Button */}
           {onToggleFavorite && (
             <button
