@@ -20,6 +20,7 @@ export interface TickerAlertItem {
   source?: string;
   headline?: string;
   urgency?: string;
+  timeAgo?: string;
 }
 
 interface WeatherViewProps {
