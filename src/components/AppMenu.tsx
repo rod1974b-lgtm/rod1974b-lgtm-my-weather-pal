@@ -11,7 +11,7 @@ interface AppMenuProps {
   onOpenAiGallery?: () => void;
 }
 
-export function AppMenu({ unit, onUnitChange, onOpenAiGallery }: AppMenuProps) {
+export function AppMenu({ unit, onUnitChange }: AppMenuProps) {
   const { t, i18n } = useTranslation();
   const [open, setOpen] = useState(false);
   const [skyPref, setSkyPref] = useState("auto");
@@ -250,7 +250,7 @@ export function AppMenu({ unit, onUnitChange, onOpenAiGallery }: AppMenuProps) {
             </div>
           </div>
 
-          {/* Footer actions */}
+          {/* Footer actions: Unified Art Gallery & Privacy links */}
           <div className="border-t border-border pt-3 flex items-center justify-between text-xs text-muted-foreground">
             <div className="flex items-center gap-3">
               <Link
@@ -258,20 +258,8 @@ export function AppMenu({ unit, onUnitChange, onOpenAiGallery }: AppMenuProps) {
                 onClick={() => setOpen(false)}
                 className="hover:text-foreground underline underline-offset-2 font-medium"
               >
-                🎨 {t("city_art", "City Art")}
+                🎨 {t("art_gallery", "Art Gallery")}
               </Link>
-              {onOpenAiGallery && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setOpen(false);
-                    onOpenAiGallery();
-                  }}
-                  className="hover:text-foreground underline underline-offset-2 font-medium cursor-pointer"
-                >
-                  ✨ {t("art_gallery", "AI Gallery")}
-                </button>
-              )}
               <Link
                 to="/privacy"
                 onClick={() => setOpen(false)}
