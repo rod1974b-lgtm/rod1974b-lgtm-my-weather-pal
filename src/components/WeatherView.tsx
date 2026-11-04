@@ -243,7 +243,7 @@ const ACCESSORY_LABELS = {
     sunglasses: "Солнцезащитные очки",
     sunscreen: "Защита от солнца",
     mask: "Маска",
-    scarf: "Шарф и перчатки",
+    scarf: "Шарฟ и перчатки",
     water: "Больше воды",
     windbreaker: "Ветровка",
     evening_drop: "Вечернее похолодание: до",
@@ -501,7 +501,7 @@ export const WeatherView: React.FC<WeatherViewProps> = ({
   const isRaining = code >= 95 || (code >= 51 && code <= 67) || (code >= 80 && code <= 82);
   const isSnowing = (code >= 71 && code <= 77) || (code >= 85 && code <= 86);
   const windKmh = unit === "imperial" ? w.current.wind * 1.60934 : w.current.wind;
-   // Category-specific clothing advice generator
+  // Category-specific clothing advice generator
   const getExpandedClothingAdvice = (): string => {
     if (wearCategory === "business") {
       if (isRaining) {
@@ -1012,7 +1012,7 @@ export const WeatherView: React.FC<WeatherViewProps> = ({
         </div>
       </section>
 
-      {/* 7. 7-DAY EXTENDED FORECAST */}
+      {/* 7. 7-DAY EXTENDED FORECAST (With Weather Words visible on both mobile & desktop) */}
       <section className="p-4 rounded-2xl bg-card border border-border/70 shadow-xs text-card-foreground">
         <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">
           {t("daily_forecast", "7-Day Forecast")}
@@ -1030,16 +1030,16 @@ export const WeatherView: React.FC<WeatherViewProps> = ({
                 key={d.date}
                 className="flex items-center justify-between p-2 rounded-xl hover:bg-muted/30 transition text-sm"
               >
-                <div className="w-20 font-medium">
+                <div className="w-16 sm:w-20 font-medium shrink-0">
                   {dayName}
                 </div>
-                <div className="flex items-center gap-2">
-                  <WeatherIcon code={d.code} isDay={1} className="w-6 h-6" />
-                  <span className="text-xs text-muted-foreground hidden sm:inline w-28 truncate">
+                <div className="flex items-center gap-2 flex-1 min-w-0 px-2">
+                  <WeatherIcon code={d.code} isDay={1} className="w-6 h-6 shrink-0" />
+                  <span className="text-xs text-muted-foreground truncate">
                     {getConditionLabel(d.code, t)}
                   </span>
                 </div>
-                <div className="flex items-center gap-2 font-semibold">
+                <div className="flex items-center gap-1.5 font-semibold shrink-0">
                   <span className="text-foreground">{Math.round(d.max)}°</span>
                   <span className="text-muted-foreground/60 text-xs">/</span>
                   <span className="text-muted-foreground">{Math.round(d.min)}°</span>
