@@ -1,6 +1,6 @@
 // src/routes/index.tsx
 import { useState, useEffect } from "react";
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
 import {
   type Weather,
@@ -19,7 +19,6 @@ import {
 } from "@/lib/weather";
 import { WeatherView, type TickerAlertItem } from "@/components/WeatherView";
 import { AppMenu } from "@/components/AppMenu";
-import { AiGalleryModal } from "@/components/AiGalleryModal";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -58,196 +57,155 @@ async function fetchUSGSEarthquakes(lat: number, lon: number): Promise<TickerAle
     );
     if (!res.ok) return [];
     const data = await res.json();
-    const features = data?.features || [];
-    const nearby: TickerAlertItem[] = [];
+    const now = Date.now();
 
-    for (const f of features) {
-      const coords = f.geometry?.coordinates;
-      if (!coords || coords.length < 2) continue;
-      const eqLon = coords[0];
-      const eqLat = coords[1];
-      const mag = f.properties?.mag ?? 0;
-      const placeName = f.properties?.place ?? "Regional epicenter";
+    const quakes: TickerAlertItem[] = [];
+    for (const f of data.features || []) {
+      const [qLon, qLat] = f.geometry.coordinates;
+      const mag = f.properties.mag;
+      const placeName = f.properties.place;
+      const time = f.properties.time;
 
-      const dLat = ((eqLat - lat) * Math.PI) / 180;
-      const dLon = ((eqLon - lon) * Math.PI) / 180;
-      const a =
-        Math.sin(dLat / 2) ** 2 +
-        Math.cos((lat * Math.PI) / 180) *
-          Math.cos((eqLat * Math.PI) / 180) *
-          Math.sin(dLon / 2) ** 2;
-      const distKm = 6371 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+      if (now - time > 48 * 3600 * 1000) continue;
 
-      if (distKm <= 1200 && mag >= 4.5) {
-        nearby.push({
-          id: `eq-${f.id}`,
-          severity: mag >= 6.0 ? "danger" : "warning",
+      const dLat = (qLat - lat) * 111;
+      const dLon = (qLon - lon) * 111 * Math.cos((lat * Math.PI) / 180);
+      const distKm = Math.sqrt(dLat * dLat + dLon * dLon);
+
+      if (distKm <= 1200) {
+        quakes.push({
+          id: `usgs-${f.id}`,
+          severity: mag >= 6.0 ? "warning" : "advisory",
           category: "earthquake",
+          headline: `M${mag.toFixed(1)} Earthquake — ${placeName} (${Math.round(distKm)} km away)`,
           source: "USGS",
-          headline: `M${mag.toFixed(1)} Earthquake • ${placeName} (${Math.round(distKm)}km away)`,
-          urgency: "Immediate",
+          timeAgo: formatTimeAgo(time),
         });
       }
     }
-    return nearby.slice(0, 3);
+    return quakes;
   } catch {
     return [];
   }
 }
 
-// Fetch NWS Active Alerts (US locations)
-async function fetchNWSAlerts(lat: number, lon: number): Promise<TickerAlertItem[]> {
+// Fetch TMD (Thailand Meteorological Department) Warnings
+async function fetchTMDWarnings(place: Place): Promise<TickerAlertItem[]> {
+  const isThailand =
+    place.country?.toLowerCase().includes("thailand") ||
+    (place.lat >= 5.6 && place.lat <= 20.5 && place.lon >= 97.3 && place.lon <= 105.7);
+
+  if (!isThailand) return [];
+
   try {
     const res = await fetch(
-      `https://api.weather.gov/alerts/active?point=${lat.toFixed(4)},${lon.toFixed(4)}`,
-      {
-        headers: { "User-Agent": "MyWeatherPal/1.0" },
-        signal: AbortSignal.timeout(4000),
-      }
+      "https://data.tmd.go.th/api/WeatherWarningNews/v1/?uid=api&ukey=api1234&format=json",
+      { signal: AbortSignal.timeout(3500) }
     );
     if (!res.ok) return [];
     const data = await res.json();
-    const features = data?.features || [];
+    const warnings = data.WarningNews || [];
+    const now = Date.now();
 
-    return features.slice(0, 3).map((f: any) => ({
-      id: f.id || String(Math.random()),
-      severity: f.properties?.severity === "Extreme" ? "danger" : "warning",
-      category: "weather",
-      source: "NWS",
-      headline: f.properties?.headline || f.properties?.event || "Severe Weather Advisory",
-      urgency: f.properties?.urgency || "Expected",
+    return warnings.slice(0, 2).map((w: any, idx: number) => ({
+      id: `tmd-${idx}-${now}`,
+      severity: "warning",
+      category: "storm",
+      headline: `TMD Advisory: ${w.TitleEnglish || w.TitleThai || "Heavy Rain / High Waves Warning"}`,
+      source: "TMD",
+      timeAgo: "Active",
     }));
   } catch {
     return [];
   }
 }
 
-// Fetch TMD Weather Warnings (Thailand)
-async function fetchTMDWarnings(country: string): Promise<TickerAlertItem[]> {
-  if (!country || !country.toLowerCase().includes("thailand")) return [];
+// Fetch Open-Meteo Severe Weather Alerts
+async function fetchOpenMeteoAlerts(lat: number, lon: number): Promise<TickerAlertItem[]> {
   try {
     const res = await fetch(
-      "https://data.tmd.go.th/api/WeatherWarning/v2/?uid=api&ukey=api&format=json",
+      `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&daily=precipitation_sum,precipitation_probability_max,wind_speed_10m_max&timezone=auto`,
       { signal: AbortSignal.timeout(4000) }
     );
     if (!res.ok) return [];
     const data = await res.json();
-    const warnings = data?.DailyWeatherWarning?.WarningList || [];
-    if (!warnings.length) return [];
+    const alerts: TickerAlertItem[] = [];
 
-    const first = warnings[0];
-    const title = first?.TitleEng || first?.TitleThai || "TMD Monsoon & Rain Warning";
-    return [
-      {
-        id: "tmd-warning",
+    const rainSum = data.daily?.precipitation_sum?.[0] ?? 0;
+    const rainProb = data.daily?.precipitation_probability_max?.[0] ?? 0;
+    const maxWind = data.daily?.wind_speed_10m_max?.[0] ?? 0;
+
+    if (rainSum >= 45) {
+      alerts.push({
+        id: "om-heavy-rain",
         severity: "warning",
-        category: "monsoon",
-        source: "TMD Thailand",
-        headline: title,
-        urgency: "Expected",
-      },
-    ];
+        category: "flood",
+        headline: `Heavy Rain Alert: Up to ${Math.round(rainSum)}mm expected (${rainProb}% chance)`,
+        source: "Open-Meteo",
+        timeAgo: "Today",
+      });
+    } else if (rainSum >= 25) {
+      alerts.push({
+        id: "om-moderate-rain",
+        severity: "advisory",
+        category: "rain",
+        headline: `Rain Advisory: ${Math.round(rainSum)}mm rain expected (${rainProb}% chance)`,
+        source: "Open-Meteo",
+        timeAgo: "Today",
+      });
+    }
+
+    if (maxWind >= 60) {
+      alerts.push({
+        id: "om-high-wind",
+        severity: "warning",
+        category: "storm",
+        headline: `High Wind Warning: Gusts up to ${Math.round(maxWind)} km/h`,
+        source: "Open-Meteo",
+        timeAgo: "Today",
+      });
+    }
+
+    return alerts;
   } catch {
     return [];
   }
 }
 
-// Fetch Open-Meteo River Discharge & Flood Alerts
-async function fetchRiverDischarge(lat: number, lon: number): Promise<TickerAlertItem[]> {
+// Fetch NWS Active Alerts (US locations only)
+async function fetchNWSAlerts(lat: number, lon: number): Promise<TickerAlertItem[]> {
   try {
-    const res = await fetch(
-      `https://flood-api.open-meteo.com/v1/flood?latitude=${lat.toFixed(4)}&longitude=${lon.toFixed(4)}&daily=river_discharge,river_discharge_mean&forecast_days=3`,
-      { signal: AbortSignal.timeout(4000) }
-    );
+    const res = await fetch(`https://api.weather.gov/alerts/active?point=${lat},${lon}`, {
+      headers: { "User-Agent": "(myweatherpal.app, contact@myweatherpal.app)" },
+      signal: AbortSignal.timeout(3500),
+    });
     if (!res.ok) return [];
     const data = await res.json();
-    const discharges = data?.daily?.river_discharge || [];
-    const means = data?.daily?.river_discharge_mean || [];
+    const features = data.features || [];
 
-    if (discharges.length > 0 && means.length > 0) {
-      const currentQ = discharges[0];
-      const meanQ = means[0];
-      if (meanQ > 5 && currentQ > meanQ * 2.0) {
-        return [
-          {
-            id: `flood-river`,
-            severity: "warning",
-            category: "flood",
-            source: "Open-Meteo River Model",
-            headline: `Elevated River Flow (${Math.round(currentQ)} m³/s vs normal ${Math.round(meanQ)} m³/s) — Basin flood watch`,
-            urgency: "Future",
-          },
-        ];
-      }
-    }
-    return [];
+    return features.slice(0, 2).map((f: any) => ({
+      id: `nws-${f.id}`,
+      severity: f.properties.severity === "Severe" ? "warning" : "advisory",
+      category: f.properties.event?.toLowerCase().includes("flood") ? "flood" : "storm",
+      headline: `${f.properties.event}: ${f.properties.headline || f.properties.description?.slice(0, 100)}`,
+      source: "NWS",
+      timeAgo: "Active",
+    }));
   } catch {
     return [];
   }
 }
 
-// Synthesize local weather warnings from current forecast
-function getLocalWeatherAdvisories(w: Weather | null): TickerAlertItem[] {
-  if (!w?.current) return [];
-  const items: TickerAlertItem[] = [];
-  const code = w.current.code;
-
-  if ([95, 96, 99].includes(code)) {
-    items.push({
-      id: "local-thunderstorm",
-      severity: "danger",
-      category: "storm",
-      source: "Live Radar",
-      headline: `Severe Thunderstorm & Lightning in effect for ${w.place.name}. Seek indoor shelter.`,
-      urgency: "Immediate",
-    });
-  } else if ([65, 82].includes(code)) {
-    items.push({
-      id: "local-heavy-rain",
-      severity: "warning",
-      category: "rain",
-      source: "Live Radar",
-      headline: `Heavy to very heavy rains active in ${w.place.name} — drive with extreme caution.`,
-      urgency: "Expected",
-    });
-  } else if ([75, 86].includes(code)) {
-    items.push({
-      id: "local-heavy-snow",
-      severity: "warning",
-      category: "snow",
-      source: "Live Radar",
-      headline: `Heavy snowfall warning in effect for ${w.place.name}. Expect reduced visibility.`,
-      urgency: "Expected",
-    });
-  }
-
-  if (w.current.wind && w.current.wind >= 45) {
-    items.push({
-      id: "local-high-wind",
-      severity: "warning",
-      category: "wind",
-      source: "Live Station",
-      headline: `High Wind Advisory: gusts up to ${Math.round(w.current.wind)} km/h recorded.`,
-      urgency: "Expected",
-    });
-  }
-
-  if (w.current.aqi && w.current.aqi >= 151) {
-    items.push({
-      id: "local-unhealthy-aqi",
-      severity: "warning",
-      category: "air-quality",
-      source: "Air Quality Station",
-      headline: `Unhealthy Air Quality (AQI ${w.current.aqi}). Sensitive groups should wear masks.`,
-      urgency: "Expected",
-    });
-  }
-
-  return items;
+function formatTimeAgo(timestamp: number): string {
+  const diffSec = Math.floor((Date.now() - timestamp) / 1000);
+  if (diffSec < 3600) return `${Math.max(1, Math.floor(diffSec / 60))}m ago`;
+  if (diffSec < 86400) return `${Math.floor(diffSec / 3600)}h ago`;
+  return `${Math.floor(diffSec / 86400)}d ago`;
 }
 
 function Index() {
   const { t } = useTranslation();
+  const navigate = useNavigate();
   const [unit, setUnit] = useState<WeatherUnit>("metric");
   const [place, setPlace] = useState<Place>(DEFAULT_PLACE);
   const [weather, setWeather] = useState<Weather | null>(null);
@@ -268,7 +226,6 @@ function Index() {
   // Background and Sky Theme
   const [customBgUrl, setCustomBgUrl] = useState<string | null>(null);
   const [skyPref, setSkyPref] = useState<string>("auto");
-  const [showAiGallery, setShowAiGallery] = useState<boolean>(false);
 
   // 1. Initial Preferences
   useEffect(() => {
@@ -290,23 +247,30 @@ function Index() {
     return () => window.removeEventListener("weather:sky-change", handleSkyChange);
   }, []);
 
-  // 2. Fetch Weather & All Disaster Feeds
-  const fetchAllWeatherData = async (targetPlace: Place, targetUnit: WeatherUnit) => {
+  // 2. Fetch Weather and Disaster Alerts
+  const fetchAllWeatherData = async (targetPlace: Place, currentUnit: WeatherUnit) => {
     setLoading(true);
     setError(null);
     try {
-      const data = await getWeather(targetPlace, targetUnit);
+      const data = await getWeather(targetPlace, currentUnit);
       setWeather(data);
 
-      const [eqAlerts, nwsAlerts, tmdAlerts, floodAlerts] = await Promise.all([
+      const [quakeAlerts, tmdAlerts, omAlerts, nwsAlerts] = await Promise.allSettled([
         fetchUSGSEarthquakes(targetPlace.lat, targetPlace.lon),
-        fetchNWSAlerts(targetPlace.lat, targetPlace.lon),
-        fetchTMDWarnings(targetPlace.country || ""),
-        fetchRiverDischarge(targetPlace.lat, targetPlace.lon),
+        fetchTMDWarnings(targetPlace),
+        fetchOpenMeteoAlerts(targetPlace.lat, targetPlace.lon),
+        targetPlace.country === "United States" || targetPlace.country === "USA"
+          ? fetchNWSAlerts(targetPlace.lat, targetPlace.lon)
+          : Promise.resolve([]),
       ]);
 
-      const localAlerts = getLocalWeatherAdvisories(data);
-      const combined = [...localAlerts, ...floodAlerts, ...tmdAlerts, ...nwsAlerts, ...eqAlerts];
+      const combined: TickerAlertItem[] = [
+        ...(quakeAlerts.status === "fulfilled" ? quakeAlerts.value : []),
+        ...(tmdAlerts.status === "fulfilled" ? tmdAlerts.value : []),
+        ...(omAlerts.status === "fulfilled" ? omAlerts.value : []),
+        ...(nwsAlerts.status === "fulfilled" ? nwsAlerts.value : []),
+      ];
+
       setAlerts(combined);
     } catch (err: any) {
       setError(err?.message || "Failed to load weather forecast");
@@ -315,7 +279,7 @@ function Index() {
     }
   };
 
-  // Check if user came back from City Art Gallery with a selected city
+  // Check if user came back from Art Gallery with a selected city
   useEffect(() => {
     try {
       const galleryCity = localStorage.getItem("weather:last-searched-city");
@@ -378,104 +342,117 @@ function Index() {
   useEffect(() => {
     if (!query.trim() || query.length < 2) {
       setSuggestions([]);
-      setSearching(false);
       return;
     }
-    setSearching(true);
+
     const timer = setTimeout(async () => {
-      const results = await searchCity(query);
-      setSuggestions(results);
-      setSearching(false);
-    }, 280);
+      setSearching(true);
+      try {
+        const results = await searchCity(query);
+        setSuggestions(results);
+      } catch {
+        setSuggestions([]);
+      } finally {
+        setSearching(false);
+      }
+    }, 300);
+
     return () => clearTimeout(timer);
   }, [query]);
 
-  // Geolocation lookup
-  const handleUseLocation = () => {
-    if (!navigator.geolocation) {
-      alert("Geolocation is not supported by your browser");
-      return;
-    }
-    setLoading(true);
-    navigator.geolocation.getCurrentPosition(
-      async (pos) => {
-        const { latitude: lat, longitude: lon } = pos.coords;
-        let detectedName = "Current Location";
-        let detectedCountry = "";
-
-        try {
-          const res = await fetch(
-            `https://photon.komoot.io/reverse?lat=${lat}&lon=${lon}`,
-            { signal: AbortSignal.timeout(3500) }
-          );
-          if (res.ok) {
-            const data = await res.json();
-            const first = data?.features?.[0]?.properties;
-            if (first) {
-              detectedName = first.city || first.town || first.name || detectedName;
-              detectedCountry = first.country || "";
-            }
-          }
-        } catch {}
-
-        setPlace({
-          name: detectedName,
-          country: detectedCountry,
-          lat,
-          lon,
-        });
-      },
-      () => {
-        setLoading(false);
-        alert("Unable to retrieve your location. Please check device permissions.");
-      },
-      { timeout: 8000 }
-    );
-  };
-
-  const handleSelectPlace = (p: Place) => {
-    setPlace(p);
+  const handleSelectPlace = (newPlace: Place) => {
+    setPlace(newPlace);
     setQuery("");
     setSuggestions([]);
   };
 
   const handleToggleFavorite = () => {
-    const updated = isFavorite(place, favorites)
+    const isFav = isFavorite(place, favorites);
+    const updated = isFav
       ? favorites.filter((f) => !isSamePlace(f, place))
       : [...favorites, place];
+
     setFavorites(updated);
     saveFavorites(updated);
   };
 
+  // Reverse geocoding HTML5 GPS
+  const handleUseCurrentLocation = () => {
+    if (!navigator.geolocation) {
+      setError("Geolocation is not supported by your browser");
+      return;
+    }
+
+    setLoading(true);
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        const { latitude, longitude } = pos.coords;
+        try {
+          const res = await fetch(
+            `https://photon.komoot.io/reverse?lat=${latitude}&lon=${longitude}`
+          );
+          if (res.ok) {
+            const data = await res.json();
+            const feat = data.features?.[0]?.properties;
+            const cityName =
+              feat?.city || feat?.name || feat?.district || feat?.state || "Current Location";
+            const countryName = feat?.country || "";
+
+            handleSelectPlace({
+              name: cityName,
+              country: countryName,
+              lat: latitude,
+              lon: longitude,
+            });
+            return;
+          }
+        } catch {}
+
+        handleSelectPlace({
+          name: "My Location",
+          country: "",
+          lat: latitude,
+          lon: longitude,
+        });
+      },
+      (err) => {
+        setLoading(false);
+        setError(`Unable to retrieve your location: ${err.message}`);
+      },
+      { timeout: 8000 }
+    );
+  };
+
   const handleSelectCustomBg = (url: string) => {
     const key = `weather:custom-bg:${place.name.trim().toLowerCase()}`;
-    if (!url) {
-      localStorage.removeItem(key);
-      setCustomBgUrl(null);
-    } else {
+    if (url) {
       localStorage.setItem(key, url);
       setCustomBgUrl(url);
+    } else {
+      localStorage.removeItem(key);
+      setCustomBgUrl(null);
     }
     window.dispatchEvent(
       new CustomEvent("weather:custom-bg-change", {
-        detail: { city: place.name, url },
+        detail: { city: place.name.trim().toLowerCase(), url },
       })
     );
   };
 
-  // Determine active sky theme
-  const autoSky = weather ? skyKey(weather.current.code, weather.current.is_day) : "day";
-  const activeSky = skyPref === "auto" ? autoSky : skyPref;
+  // Derived Sky Theme
+  const activeSky = skyPref === "auto" ? (weather ? skyKey(weather) : "day") : skyPref;
 
   return (
-    <div className={`min-h-screen text-foreground sky sky-${activeSky} transition-colors duration-500`}>
-      {/* Top Header Bar */}
+    <div
+      className={`min-h-screen text-foreground transition-colors duration-500 sky-${activeSky}`}
+    >
+      {/* Top Application Header */}
       <header className="sticky top-0 z-40 border-b border-border/40 bg-background/80 backdrop-blur-md">
         <div className="mx-auto flex max-w-4xl items-center justify-between px-4 py-3 sm:px-6">
           <div className="flex items-center gap-2.5">
-            <span className="text-2xl leading-none select-none">🌦️</span>
+            <span className="text-2xl select-none leading-none">🌤️</span>
             <div>
-              <h1 className="text-base font-bold leading-tight tracking-tight text-foreground">
+              <h1 className="text-base font-bold tracking-tight leading-tight">
                 {t("app_title", "My Weather Pal")}
               </h1>
               <p className="text-[11px] font-medium text-muted-foreground leading-none">
@@ -491,7 +468,6 @@ function Index() {
                 setUnit(u);
                 saveUnitPref(u);
               }}
-              onOpenAiGallery={() => setShowAiGallery(true)}
             />
           </div>
         </div>
@@ -508,9 +484,11 @@ function Index() {
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder={t("search_placeholder", "Search city or landmark...")}
-                className="w-full rounded-2xl border border-border/80 bg-card px-4 py-2.5 pl-10 text-sm shadow-xs transition-colors placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
+                className="w-full rounded-2xl border border-border/60 bg-card/80 px-4 py-2.5 pl-10 text-sm shadow-xs backdrop-blur-xs placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
               />
-              <span className="absolute left-3.5 top-3 text-muted-foreground text-sm">🔍</span>
+              <span className="absolute left-3.5 top-3 text-sm text-muted-foreground select-none">
+                🔍
+              </span>
               {searching && (
                 <span className="absolute right-3.5 top-3 text-xs text-muted-foreground animate-spin">
                   ⏳
@@ -520,23 +498,23 @@ function Index() {
 
             <button
               type="button"
-              onClick={handleUseLocation}
-              title={t("use_location", "Use My Location")}
-              className="flex items-center justify-center rounded-2xl border border-border/80 bg-card px-4 py-2.5 text-sm shadow-xs transition-colors hover:bg-muted cursor-pointer"
+              onClick={handleUseCurrentLocation}
+              title={t("use_location", "Use GPS Location")}
+              className="flex h-10 w-10 items-center justify-center rounded-2xl border border-border/60 bg-card/80 text-foreground shadow-xs hover:bg-muted/80 backdrop-blur-xs transition"
             >
-              📍
+              <span className="text-base select-none">📍</span>
             </button>
           </div>
 
-          {/* Autocomplete Suggestions Dropdown */}
+          {/* Autocomplete Dropdown */}
           {suggestions.length > 0 && (
-            <div className="absolute left-0 right-0 top-full z-50 mt-1.5 overflow-hidden rounded-2xl border border-border bg-popover shadow-xl backdrop-blur-md">
+            <div className="absolute left-0 right-0 top-12 z-30 max-h-60 overflow-y-auto rounded-2xl border border-border bg-card/95 p-1.5 shadow-xl backdrop-blur-md">
               {suggestions.map((s, idx) => (
                 <button
                   key={`${s.name}-${s.lat}-${idx}`}
                   type="button"
                   onClick={() => handleSelectPlace(s)}
-                  className="flex w-full items-center justify-between px-4 py-2.5 text-left text-sm hover:bg-muted transition-colors border-b border-border/40 last:border-0"
+                  className="flex w-full items-center justify-between rounded-xl px-3 py-2 text-left text-sm hover:bg-muted/80 transition"
                 >
                   <span className="font-medium text-foreground">{s.name}</span>
                   <span className="text-xs text-muted-foreground">{s.country}</span>
@@ -546,37 +524,35 @@ function Index() {
           )}
         </section>
 
-        {/* Favorite Cities Bar */}
+        {/* Favorite Cities Chips */}
         {favorites.length > 0 && (
-          <section className="flex items-center gap-2">
-            <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              {t("favorites", "Favorites")}:
+          <section className="flex flex-wrap items-center gap-1.5">
+            <span className="text-xs font-semibold text-muted-foreground mr-1">
+              ★ {t("favorites", "Favorites")}:
             </span>
-            <div className="flex flex-wrap items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
-              {favorites.map((fav) => {
-                const isSelected = isSamePlace(fav, place);
-                return (
-                  <button
-                    key={`${fav.name}-${fav.lat}`}
-                    type="button"
-                    onClick={() => handleSelectPlace(fav)}
-                    className={`rounded-full px-3 py-1 text-xs font-medium transition-all ${
-                      isSelected
-                        ? "bg-primary text-primary-foreground shadow-xs"
-                        : "border border-border/80 bg-card hover:bg-muted text-foreground"
-                    }`}
-                  >
-                    {fav.name}
-                  </button>
-                );
-              })}
-            </div>
+            {favorites.map((fav) => {
+              const active = isSamePlace(fav, place);
+              return (
+                <button
+                  key={`${fav.name}-${fav.lat}`}
+                  type="button"
+                  onClick={() => handleSelectPlace(fav)}
+                  className={`px-3 py-1 rounded-full text-xs font-medium transition cursor-pointer ${
+                    active
+                      ? "bg-primary text-primary-foreground font-semibold shadow-xs"
+                      : "border border-border/60 bg-card/80 text-foreground hover:bg-muted/80"
+                  }`}
+                >
+                  {fav.name}
+                </button>
+              );
+            })}
           </section>
         )}
 
         {/* Error Notification */}
         {error && (
-          <div className="rounded-2xl border border-destructive/50 bg-destructive/10 p-4 text-sm text-destructive">
+          <div className="rounded-2xl border border-destructive/30 bg-destructive/10 p-3.5 text-xs font-medium text-destructive">
             ⚠️ {error}
           </div>
         )}
@@ -592,32 +568,11 @@ function Index() {
             isFav={isFavorite(place, favorites)}
             onToggleFavorite={handleToggleFavorite}
             onSelectBackground={handleSelectCustomBg}
-            onOpenAiGallery={() => setShowAiGallery(true)}
+            onOpenAiGallery={() => navigate({ to: "/gallery" })}
             customBgUrl={customBgUrl}
           />
         )}
       </main>
-
-      {/* AI Gallery Modal */}
-      {weather && (
-        <AiGalleryModal
-          isOpen={showAiGallery}
-          onClose={() => setShowAiGallery(false)}
-          cityName={weather.place.name}
-          country={weather.place.country ?? ""}
-          weatherDesc={describe(weather.current.code).label}
-          weatherCode={weather.current.code}
-          currentTemp={
-            weather.unit === "imperial"
-              ? ((weather.current.temp - 32) * 5) / 9
-              : weather.current.temp
-          }
-          activeBg={customBgUrl}
-          activeBackground={customBgUrl || ""}
-          onSelectBackground={(url: string) => handleSelectCustomBg(url)}
-          onSelectBg={(url: string) => handleSelectCustomBg(url)}
-        />
-      )}
 
       {/* Footer */}
       <footer className="mt-8 border-t border-border/40 py-6 text-center text-xs text-muted-foreground">
@@ -625,8 +580,8 @@ function Index() {
           {t("weather_by", "Weather data by Open-Meteo • AI Watercolor Art")}
         </p>
         <div className="mt-2 flex justify-center gap-4">
-          <Link to="/gallery" className="hover:underline">
-            🎨 {t("city_art_gallery", "City Art Gallery")}
+          <Link to="/gallery" className="hover:underline font-medium">
+            🎨 {t("art_gallery", "Art Gallery")}
           </Link>
           <span>•</span>
           <Link to="/privacy" className="hover:underline">
