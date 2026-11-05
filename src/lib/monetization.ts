@@ -237,3 +237,118 @@ export const isAdUnlocked = (bgId: string): boolean => {
 export const getAdUnlockedBackgrounds = (): string[] => {
   return ADS_BACKGROUNDS.filter((bg) => isAdUnlocked(bg));
 };
+
+// ============================================================================
+// DONATION LINKS & MEDIAN GOOGLE PLAY BILLING BRIDGE
+// ============================================================================
+export type DonationProvider = "stripe" | "buymeacoffee" | "kofi" | "paypal";
+
+// Paste the real links here as each account is created.
+export const DONATION_CONFIG = {
+  paypalUsername: "rod1974b",
+  buyMeACoffeePage: "", // e.g. https://buymeacoffee.com/myusername
+  kofiPage: "", // e.g. https://ko-fi.com/myusername
+  stripeLinks: {
+    small_root_beer_tier: "", // Stripe Payment Link for $0.99
+    medium_root_beer_tier: "", // Stripe Payment Link for $2.99
+    large_root_beer_tier: "", // Stripe Payment Link for $4.99
+    party_pack_root_beer_tier: "", // Stripe Payment Link for $9.99
+    ai_gallery_lifetime_unlock: "", // Stripe Payment Link for $1.99
+  } as Record<string, string>,
+};
+
+const findTier = (tierId: string) =>
+  ROOT_BEER_TIERS_DEEPER_AMBER_NO_PRICE.find((t) => t.id === tierId);
+
+export const getDonationUrl = (
+  tierId: string,
+  provider: DonationProvider
+): string => {
+  const tier = findTier(tierId);
+  const amount = tier?.price ? tier.price.toFixed(2) : "1.99";
+  const note = encodeURIComponent(tier?.name || "My Weather Pal support");
+
+  switch (provider) {
+    case "stripe": {
+      const link = DONATION_CONFIG.stripeLinks[tierId];
+      if (link) return link;
+      // Generic Stripe fallback (replace with a real Payment Link).
+      return `https://buy.stripe.com/${tierId}`;
+    }
+    case "buymeacoffee": {
+      if (DONATION_CONFIG.buyMeACoffeePage) {
+        return `${DONATION_CONFIG.buyMeACoffeePage}/?amount=${amount}`;
+      }
+      return `https://buymeacoffee.com/?amount=${amount}`;
+    }
+    case "kofi": {
+      return DONATION_CONFIG.kofiPage || "https://ko-fi.com/";
+    }
+    case "paypal":
+    default: {
+      return `https://paypal.me/${DONATION_CONFIG.paypalUsername}/${amount}USD?locale.x=en_US&note=${note}`;
+    }
+  }
+};
+
+// Detects the Median.co Android WebView wrapper.
+export const isMedianAndroidApp = (): boolean => {
+  if (typeof window === "undefined") return false;
+  const w = window as unknown as {
+    median?: unknown;
+    MedIAN?: unknown;
+  };
+  return (
+    typeof w.median !== "undefined" ||
+    typeof w.MedIAN !== "undefined" ||
+    /median/i.test(navigator.userAgent || "")
+  );
+};
+
+// Google Play In-App Purchase through the Median bridge.
+// onSuccess fires after the bridge reports a completed purchase;
+// onError fires when the bridge is missing, cancelled, or errors.
+export const purchaseTierViaGooglePlay = (
+  tierId: string,
+  onSuccess: () => void,
+  onError: (err: { message?: string } | null) => void
+): void => {
+  if (typeof window === "undefined") {
+    onError({ message: "Purchase unavailable in this environment." });
+    return;
+  }
+  const bridge = (window as unknown as {
+    median?: {
+      iap?: {
+        purchase?: (opts: {
+          productID?: string;
+          productId?: string;
+          callback?: (result: { event?: string; errorMessage?: string }) => void;
+        }) => void;
+      };
+    };
+  }).median;
+
+  if (!bridge?.iap?.purchase) {
+    onError({
+      message: "Google Play billing is not available. Use a payment method above.",
+    });
+    return;
+  }
+
+  try {
+    bridge.iap.purchase({
+      productID: tierId,
+      callback: (result) => {
+        const event = (result?.event || "").toLowerCase();
+        if (!event || event.includes("success")) {
+          onSuccess();
+        } else {
+          onError({ message: result?.errorMessage || "Purchase was cancelled." });
+        }
+      },
+    });
+  } catch (err: any) {
+    onError({ message: err?.message || "Purchase was cancelled." });
+  }
+};

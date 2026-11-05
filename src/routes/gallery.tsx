@@ -375,7 +375,7 @@ export function ArtGalleryPage() {
       const mapping: Record<string, string> = {};
       Object.keys(LANDMARK_WATERCOLORS).forEach((c) => {
         const choice = getSavedCustomArtChoice(c);
-        if (choice?.url) mapping[c] = choice.url;
+        if (choice) mapping[c] = choice;
       });
       setActiveCityBg(mapping);
     } catch {}
@@ -396,7 +396,7 @@ export function ArtGalleryPage() {
   // User selects an art background
   const handleSelectArt = (city: string, url: string, title: string) => {
     const formatted = formatCityName(city);
-    saveCustomArtChoice(city, url, title);
+    saveCustomArtChoice(city, url);
     setActiveCityBg((prev) => ({ ...prev, [city]: url }));
 
     try {
@@ -457,13 +457,12 @@ export function ArtGalleryPage() {
       const res = await generateWatercolorFn({
         data: {
           city: genCity.trim() || currentCity,
-          userPrompt: genPrompt.trim(),
-          mood: genMood,
+          userPrompt: `${genMood ? genMood + " mood: " : ""}${genPrompt.trim()}`,
         },
       });
 
-      if (!res.success || !res.imageUrl) {
-        throw new Error(res.error || "Failed to generate artwork.");
+      if (!res.imageUrl) {
+        throw new Error("Failed to generate artwork.");
       }
 
       // Automatically compress PNG base64 down to ~150KB JPEG to protect device storage
@@ -1265,6 +1264,7 @@ export function ArtGalleryPage() {
         />
       )}
     </main>
+    </div>
   );
 }
 
