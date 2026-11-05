@@ -4,6 +4,7 @@ import { Link } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
 import { LANGUAGES } from "./LanguageSelector";
 import type { WeatherUnit } from "@/lib/weather";
+import { ROOT_BEER_TIERS_DEEPER_AMBER_NO_PRICE } from "@/lib/monetization";
 
 interface AppMenuProps {
   unit: WeatherUnit;
@@ -19,6 +20,7 @@ export function AppMenu({ unit, onUnitChange }: AppMenuProps) {
   const [currentLang, setCurrentLang] = useState(() => {
     return i18n?.language?.toLowerCase().split("-")[0] || "en";
   });
+  const [showTiers, setShowTiers] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
   // Dynamic sky presets with translations
@@ -107,13 +109,19 @@ export function AppMenu({ unit, onUnitChange }: AppMenuProps) {
       window.dispatchEvent(
         new CustomEvent("weather:lang-change", { detail: code })
       );
-      // Brief delay so mobile users see the checkmark before menu closes
       setTimeout(() => {
         setOpen(false);
       }, 150);
     } catch (err) {
       console.error("Language switch error:", err);
     }
+  };
+
+  const handleSelectTier = (tierId: string) => {
+    window.dispatchEvent(
+      new CustomEvent("weather:trigger-tier-thankyou", { detail: { tierId } })
+    );
+    setOpen(false);
   };
 
   return (
@@ -141,6 +149,55 @@ export function AppMenu({ unit, onUnitChange }: AppMenuProps) {
             >
               ✕
             </button>
+          </div>
+
+          {/* Root Beer Support / Gratitude Tiers */}
+          <div className="rounded-xl border border-amber-500/30 bg-gradient-to-br from-amber-500/10 via-amber-600/5 to-amber-900/10 p-2.5 space-y-2">
+            <button
+              type="button"
+              onClick={() => setShowTiers((prev) => !prev)}
+              className="w-full flex items-center justify-between text-left cursor-pointer"
+            >
+              <div className="flex items-center gap-1.5">
+                <span className="text-base">🍺</span>
+                <div>
+                  <div className="text-xs font-bold text-amber-700 dark:text-amber-300">
+                    Buy Me a Root Beer
+                  </div>
+                  <div className="text-[10px] text-muted-foreground">
+                    Support app & unlock bonus art
+                  </div>
+                </div>
+              </div>
+              <span className="text-xs text-amber-700 dark:text-amber-300 font-semibold">
+                {showTiers ? "▲" : "▼"}
+              </span>
+            </button>
+
+            {showTiers && (
+              <div className="space-y-1.5 pt-1.5 border-t border-amber-500/20">
+                {ROOT_BEER_TIERS_DEEPER_AMBER_NO_PRICE.map((tier) => (
+                  <button
+                    key={tier.id}
+                    type="button"
+                    onClick={() => handleSelectTier(tier.id)}
+                    className="w-full text-left p-2 rounded-lg bg-card/80 hover:bg-amber-500/15 border border-border/80 hover:border-amber-500/40 transition cursor-pointer flex items-center justify-between gap-2"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <div className="text-xs font-semibold text-foreground truncate">
+                        {tier.name}
+                      </div>
+                      <div className="text-[10px] text-muted-foreground line-clamp-1">
+                        {tier.bonus.label}
+                      </div>
+                    </div>
+                    <span className="text-xs font-bold text-amber-600 dark:text-amber-400 shrink-0 px-2 py-0.5 rounded-full bg-amber-500/15 border border-amber-500/30">
+                      {tier.displayPrice}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Units */}
