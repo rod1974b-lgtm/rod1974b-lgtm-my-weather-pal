@@ -340,13 +340,8 @@ export const purchaseTierViaGooglePlay = (
     bridge.iap.purchase({
       productID: tierId,
       callback: (result) => {
-        if (
-          result?.event === "purchase成功".replace("成功", "Successed") ||
-          result?.event === "purchaseSuccessed" ||
-          result?.event === "purchaseSucceeded" ||
-          result?.event === "purchase_success" ||
-          !result?.event
-        ) {
+        const event = (result?.event || "").toLowerCase();
+        if (!event || event.includes("success")) {
           onSuccess();
         } else {
           onError({ message: result?.errorMessage || "Purchase was cancelled." });
