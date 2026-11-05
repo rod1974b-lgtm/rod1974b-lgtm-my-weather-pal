@@ -5,6 +5,7 @@ import { useTranslation } from "react-i18next";
 import { LANGUAGES } from "./LanguageSelector";
 import type { WeatherUnit } from "@/lib/weather";
 import { ROOT_BEER_TIERS_DEEPER_AMBER_NO_PRICE } from "@/lib/monetization";
+import { PaymentModal } from "./PaymentModal";
 
 interface AppMenuProps {
   unit: WeatherUnit;
@@ -21,6 +22,7 @@ export function AppMenu({ unit, onUnitChange }: AppMenuProps) {
     return i18n?.language?.toLowerCase().split("-")[0] || "en";
   });
   const [showTiers, setShowTiers] = useState(false);
+  const [paymentTierId, setPaymentTierId] = useState<string | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
   // Dynamic sky presets with translations
@@ -59,6 +61,21 @@ export function AppMenu({ unit, onUnitChange }: AppMenuProps) {
       }
     } catch {}
   }, [i18n?.language]);
+
+  // Listen for global open-payment-modal events (from Gallery, headers, etc.)
+  useEffect(() => {
+    const handleOpenPaymentEvent = (e: Event) => {
+      const customEvent = e as CustomEvent<{ tierId: string }>;
+      if (customEvent.detail?.tierId) {
+        setPaymentTierId(customEvent.detail.tierId);
+        setOpen(false);
+      }
+    };
+    window.addEventListener("weather:open-payment-modal", handleOpenPaymentEvent);
+    return () => {
+      window.removeEventListener("weather:open-payment-modal", handleOpenPaymentEvent);
+    };
+  }, []);
 
   // Reliable mobile outside-tap listener
   useEffect(() => {
@@ -118,9 +135,7 @@ export function AppMenu({ unit, onUnitChange }: AppMenuProps) {
   };
 
   const handleSelectTier = (tierId: string) => {
-    window.dispatchEvent(
-      new CustomEvent("weather:trigger-tier-thankyou", { detail: { tierId } })
-    );
+    setPaymentTierId(tierId);
     setOpen(false);
   };
 
@@ -334,6 +349,14 @@ export function AppMenu({ unit, onUnitChange }: AppMenuProps) {
             </button>
           </div>
         </div>
+      )}
+
+      {/* Payment Selection Modal (Card / Stripe, Buy Me a Coffee, PayPal, Google Play) */}
+      {paymentTierId && (
+        <PaymentModal
+          tierId={paymentTierId}
+          onClose={() => setPaymentTierId(null)}
+        />
       )}
     </div>
   );
