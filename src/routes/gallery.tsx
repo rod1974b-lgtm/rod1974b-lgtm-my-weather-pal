@@ -13,6 +13,7 @@ import {
   isAdUnlocked,
   isThankYouBackgroundUnlocked,
 } from "@/lib/monetization";
+import { PaymentModal } from "@/components/PaymentModal";
 
 const DESC =
   "Browse hand-painted landmark watercolors, weather sky unlocks, generate AI scenes, and manage your saved wallpapers in My Weather Pal.";
@@ -31,223 +32,190 @@ export const Route = createFileRoute("/gallery")({
   component: ArtGalleryPage,
 });
 
-// Regional categories for city landmark filtering
-const REGIONS: Record<string, string[]> = {
-  "Thailand & SE Asia": [
-    "ratchaburi",
-    "bangkok",
-    "chiang mai",
-    "phuket",
-    "krabi",
-    "pattaya",
-    "singapore",
-    "kuala lumpur",
-    "bali",
-    "hanoi",
-  ],
-  "East Asia": ["tokyo", "kyoto", "osaka", "seoul", "taipei", "hong kong"],
-  Europe: [
-    "london",
-    "paris",
-    "rome",
-    "barcelona",
-    "amsterdam",
-    "berlin",
-    "vienna",
-    "prague",
-    "athens",
-    "skopje",
-  ],
-  "Americas & Oceania": [
-    "new york",
-    "san francisco",
-    "los angeles",
-    "chicago",
-    "toronto",
-    "sydney",
-    "melbourne",
-  ],
-};
-
-const MOOD_PRESETS = [
-  "Golden sunset glow with warm reflections",
-  "Moody thunderstorm with dramatic dark clouds",
-  "Gentle morning rain over historic streets",
-  "Mystical morning fog and soft light",
-  "Vibrant sunny day with bright blue skies",
-  "Winter snowfall dusting rooftops",
-];
-
-// Core Weather Skies & Tier Unlocks
+// Weather sky item definition
 interface WeatherSkyItem {
   id: string;
-  title: string;
-  url: string;
-  category: "free" | "ads_24h" | "premium";
+  name: string;
+  category: "free" | "ads_24h" | "rootbeer_tier";
+  requiredTier?: string;
+  previewUrl: string;
   description: string;
-  badge: string;
 }
 
 const WEATHER_SKIES: WeatherSkyItem[] = [
   {
     id: "clear_day",
-    title: "Bangkok — Sunny Clear Sky",
-    url: "/backgrounds/vibrant/bangkok_sunny.jpg",
+    name: "Golden Sunrise & Clear Day",
     category: "free",
-    description: "Crisp blue sky with warm sunlight",
-    badge: "Free Forever",
+    previewUrl: "/icons/sky_day.png",
+    description: "Forever Free. Radiant amber daylight sky for sunny conditions.",
+  },
+  {
+    id: "clear_night",
+    name: "Deep Indigo Starry Night",
+    category: "free",
+    previewUrl: "/icons/sky_night.png",
+    description: "Forever Free. Velvet navy twilight with stars and glowing moon.",
   },
   {
     id: "cloudy_day",
-    title: "Kyoto — Overcast & Clouds",
-    url: "/backgrounds/vibrant/kyoto_sunny.jpg",
+    name: "Soft Cloud Drift",
     category: "free",
-    description: "Soft gentle clouds over traditional scenery",
-    badge: "Free Forever",
+    previewUrl: "/icons/sky_cloudy.png",
+    description: "Forever Free. Gentle overcast watercolor washes.",
   },
   {
     id: "rainy",
-    title: "Skopje — Rainy Stone Bridge",
-    url: "/backgrounds/vibrant/rain_skopje.jpg",
+    name: "Misty Rain & Showers",
     category: "ads_24h",
-    description: "Peaceful raindrops over the river and historic arches",
-    badge: "Watch Ad for 24h",
+    previewUrl: "/icons/sky_rain.png",
+    description: "Watch a quick 24-hour ad to unlock or support with Root Beer.",
   },
   {
     id: "snowy",
-    title: "Swiss Alps — Snow Vista",
-    url: "/backgrounds/vibrant/snow_swiss.jpg",
+    name: "Frosty Watercolor Blizzard",
     category: "ads_24h",
-    description: "Crisp snow-capped alpine peaks and winter calm",
-    badge: "Watch Ad for 24h",
+    previewUrl: "/icons/sky_snow.png",
+    description: "Watch a quick 24-hour ad to unlock or support with Root Beer.",
   },
   {
     id: "haze",
-    title: "Ratchaburi — Atmospheric Haze",
-    url: "/backgrounds/vibrant/ratchaburi_haze.jpg",
-    category: "premium",
-    description: "Rich atmospheric mist and misty mountain silhouettes",
-    badge: "Large & Party Tier",
+    name: "Warm Golden Haze / Sunset",
+    category: "rootbeer_tier",
+    requiredTier: "large_root_beer_tier",
+    previewUrl: "/icons/sky_sunset.png",
+    description: "Exclusive reward: Unlocks with Large Root Beer Tier ($4.99).",
   },
   {
     id: "storm",
-    title: "Dramatic Storm Watercolor",
-    url: "/backgrounds/vibrant/storm.jpg",
-    category: "premium",
-    description: "Deep rolling thunderclouds with intense watercolor wash",
-    badge: "Party Pack Exclusive",
+    name: "Thunderstorm & Purple Lightning",
+    category: "rootbeer_tier",
+    requiredTier: "party_pack_root_beer_tier",
+    previewUrl: "/icons/sky_storm.png",
+    description: "Exclusive reward: Unlocks with Party Pack Tier ($9.99).",
   },
 ];
+
+// Persistent IndexedDB Store for Saved Artwork
+const DB_NAME = "WeatherPalArtDB";
+const STORE_NAME = "artworks";
+const DB_VERSION = 1;
 
 export interface SavedArtItem {
   id: string;
   url: string;
-  label: string;
-  date: string;
+  title: string;
   city?: string;
-  timestamp: number;
+  createdAt: number;
+  source: "ai" | "upload" | "landmark";
 }
-
-const DB_NAME = "WeatherPalArtDB";
-const DB_VERSION = 1;
-const STORE_NAME = "artworks";
-const LEGACY_STORAGE_KEY = "weather:custom-art-saved";
 
 function openArtworkDB(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
     if (typeof window === "undefined" || !window.indexedDB) {
-      reject(new Error("IndexedDB is not supported in this browser."));
+      reject(new Error("IndexedDB not supported"));
       return;
     }
     const request = window.indexedDB.open(DB_NAME, DB_VERSION);
+    request.onerror = () => reject(request.error);
+    request.onsuccess = () => resolve(request.result);
     request.onupgradeneeded = (event) => {
       const db = (event.target as IDBOpenDBRequest).result;
       if (!db.objectStoreNames.contains(STORE_NAME)) {
-        const store = db.createObjectStore(STORE_NAME, { keyPath: "id" });
-        store.createIndex("timestamp", "timestamp", { unique: false });
-        store.createIndex("city", "city", { unique: false });
+        db.createObjectStore(STORE_NAME, { keyPath: "id" });
       }
     };
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error);
   });
 }
 
 async function getAllSavedArtworksFromDB(): Promise<SavedArtItem[]> {
   try {
     const db = await openArtworkDB();
-    const items: SavedArtItem[] = await new Promise((resolve, reject) => {
+    return new Promise((resolve, reject) => {
       const tx = db.transaction(STORE_NAME, "readonly");
       const store = tx.objectStore(STORE_NAME);
       const req = store.getAll();
-      req.onsuccess = () => resolve(req.result || []);
+      req.onsuccess = () => {
+        const items = (req.result as SavedArtItem[]) || [];
+        items.sort((a, b) => b.createdAt - a.createdAt);
+        resolve(items);
+      };
       req.onerror = () => reject(req.error);
     });
-
+  } catch (err) {
+    console.warn("Falling back from IndexedDB:", err);
     try {
-      const legacyRaw = localStorage.getItem(LEGACY_STORAGE_KEY);
-      if (legacyRaw) {
-        const legacyList = JSON.parse(legacyRaw);
-        if (Array.isArray(legacyList) && legacyList.length > 0) {
-          for (const item of legacyList) {
-            const url = typeof item === "string" ? item : item?.url;
-            if (url && !items.some((i) => i.url === url)) {
-              const migrated: SavedArtItem = {
-                id: Date.now().toString() + Math.random().toString(36).slice(2, 6),
-                url,
-                label: typeof item === "object" && item?.title ? item.title : "Saved Artwork",
-                date: new Date().toLocaleDateString(),
-                timestamp: Date.now(),
-              };
-              await saveArtworkToDB(migrated);
-              items.unshift(migrated);
-            }
-          }
-          localStorage.removeItem(LEGACY_STORAGE_KEY);
-        }
-      }
-    } catch {}
-
-    return items.sort((a, b) => b.timestamp - a.timestamp);
-  } catch {
-    return [];
+      const raw = localStorage.getItem("weather:custom-art-saved");
+      return raw ? JSON.parse(raw) : [];
+    } catch {
+      return [];
+    }
   }
 }
 
 async function saveArtworkToDB(item: SavedArtItem): Promise<void> {
-  const db = await openArtworkDB();
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(STORE_NAME, "readwrite");
-    const store = tx.objectStore(STORE_NAME);
-    const req = store.put(item);
-    req.onsuccess = () => resolve();
-    req.onerror = () => reject(req.error);
-  });
+  try {
+    const db = await openArtworkDB();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(STORE_NAME, "readwrite");
+      const store = tx.objectStore(STORE_NAME);
+      store.put(item);
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+    });
+  } catch (err) {
+    console.warn("Falling back to localStorage for save:", err);
+    try {
+      const existing = JSON.parse(localStorage.getItem("weather:custom-art-saved") || "[]");
+      const updated = [item, ...existing.filter((x: any) => x.id !== item.id)].slice(0, 15);
+      localStorage.setItem("weather:custom-art-saved", JSON.stringify(updated));
+    } catch {}
+  }
 }
 
 async function deleteArtworkFromDB(id: string): Promise<void> {
-  const db = await openArtworkDB();
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(STORE_NAME, "readwrite");
-    const store = tx.objectStore(STORE_NAME);
-    const req = store.delete(id);
-    req.onsuccess = () => resolve();
-    req.onerror = () => reject(req.error);
-  });
+  try {
+    const db = await openArtworkDB();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(STORE_NAME, "readwrite");
+      const store = tx.objectStore(STORE_NAME);
+      store.delete(id);
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+    });
+  } catch {
+    try {
+      const existing = JSON.parse(localStorage.getItem("weather:custom-art-saved") || "[]");
+      const updated = existing.filter((x: any) => x.id !== id);
+      localStorage.setItem("weather:custom-art-saved", JSON.stringify(updated));
+    } catch {}
+  }
 }
 
 async function clearAllArtworksFromDB(): Promise<void> {
-  const db = await openArtworkDB();
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(STORE_NAME, "readwrite");
-    const store = tx.objectStore(STORE_NAME);
-    const req = store.clear();
-    req.onsuccess = () => resolve();
-    req.onerror = () => reject(req.error);
-  });
+  try {
+    const db = await openArtworkDB();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(STORE_NAME, "readwrite");
+      const store = tx.objectStore(STORE_NAME);
+      store.clear();
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+    });
+  } catch {
+    try {
+      localStorage.removeItem("weather:custom-art-saved");
+    } catch {}
+  }
 }
 
-function compressDataUrl(dataUrl: string, maxDim = 1280, quality = 0.85): Promise<string> {
+// Client-side canvas image compressor
+async function compressDataUrl(
+  dataUrl: string,
+  maxWidth = 1280,
+  maxHeight = 1280,
+  quality = 0.85
+): Promise<string> {
   return new Promise((resolve) => {
     if (typeof window === "undefined") {
       resolve(dataUrl);
@@ -258,15 +226,17 @@ function compressDataUrl(dataUrl: string, maxDim = 1280, quality = 0.85): Promis
     img.onload = () => {
       let width = img.width;
       let height = img.height;
-      if (width > maxDim || height > maxDim) {
-        if (width > height) {
-          height = Math.round((height * maxDim) / width);
-          width = maxDim;
+
+      if (width > maxWidth || height > maxHeight) {
+        if (width / height > maxWidth / maxHeight) {
+          height = Math.round((height * maxWidth) / width);
+          width = maxWidth;
         } else {
-          width = Math.round((width * maxDim) / height);
-          height = maxDim;
+          width = Math.round((width * maxHeight) / height);
+          height = maxHeight;
         }
       }
+
       const canvas = document.createElement("canvas");
       canvas.width = width;
       canvas.height = height;
@@ -275,48 +245,31 @@ function compressDataUrl(dataUrl: string, maxDim = 1280, quality = 0.85): Promis
         resolve(dataUrl);
         return;
       }
-      ctx.imageSmoothingEnabled = true;
-      ctx.imageSmoothingQuality = "high";
+
       ctx.drawImage(img, 0, 0, width, height);
-      resolve(canvas.toDataURL("image/jpeg", quality));
+      const compressed = canvas.toDataURL("image/jpeg", quality);
+      resolve(compressed);
     };
     img.onerror = () => resolve(dataUrl);
     img.src = dataUrl;
   });
 }
 
-function optimizeImageFile(file: File, maxDim = 1280, quality = 0.88): Promise<string> {
+function optimizeImageFile(file: File, maxDim = 1280, quality = 0.85): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
-    reader.onload = () => {
-      const img = new Image();
-      img.onload = () => {
-        let width = img.width;
-        let height = img.height;
-        if (width > maxDim || height > maxDim) {
-          if (width > height) {
-            height = Math.round((height * maxDim) / width);
-            width = maxDim;
-          } else {
-            width = Math.round((width * maxDim) / height);
-            height = maxDim;
-          }
-        }
-        const canvas = document.createElement("canvas");
-        canvas.width = width;
-        canvas.height = height;
-        const ctx = canvas.getContext("2d");
-        if (!ctx) {
-          resolve(reader.result as string);
-          return;
-        }
-        ctx.imageSmoothingEnabled = true;
-        ctx.imageSmoothingQuality = "high";
-        ctx.drawImage(img, 0, 0, width, height);
-        resolve(canvas.toDataURL("image/jpeg", quality));
-      };
-      img.onerror = () => resolve(reader.result as string);
-      img.src = reader.result as string;
+    reader.onload = async (e) => {
+      const raw = e.target?.result as string;
+      if (!raw) {
+        reject(new Error("Failed reading file"));
+        return;
+      }
+      try {
+        const compressed = await compressDataUrl(raw, maxDim, maxDim, quality);
+        resolve(compressed);
+      } catch {
+        resolve(raw);
+      }
     };
     reader.onerror = reject;
     reader.readAsDataURL(file);
@@ -325,98 +278,142 @@ function optimizeImageFile(file: File, maxDim = 1280, quality = 0.88): Promise<s
 
 function formatCityName(slug: string): string {
   return slug
-    .split(" ")
+    .split("-")
     .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
     .join(" ");
 }
 
-function ArtGalleryPage() {
+const REGION_MAP: Record<string, string> = {
+  Bangkok: "Southeast Asia",
+  Ratchaburi: "Southeast Asia",
+  Chiangmai: "Southeast Asia",
+  Phuket: "Southeast Asia",
+  Pattaya: "Southeast Asia",
+  Ayutthaya: "Southeast Asia",
+  Singapore: "Southeast Asia",
+  Tokyo: "East Asia",
+  Kyoto: "East Asia",
+  Seoul: "East Asia",
+  Taipei: "East Asia",
+  Hongkong: "East Asia",
+  Beijing: "East Asia",
+  Shanghai: "East Asia",
+  Paris: "Europe",
+  London: "Europe",
+  Rome: "Europe",
+  Venice: "Europe",
+  Amsterdam: "Europe",
+  Barcelona: "Europe",
+  Berlin: "Europe",
+  Prague: "Europe",
+  Vienna: "Europe",
+  Santorini: "Europe",
+  Newyork: "Americas",
+  Sanfrancisco: "Americas",
+  Losangeles: "Americas",
+  Riodejaneiro: "Americas",
+  Sydney: "Oceania",
+  Melbourne: "Oceania",
+  Dubai: "Middle East",
+  Cairo: "Middle East",
+};
+
+export function ArtGalleryPage() {
   const { t } = useTranslation();
   const navigate = useNavigate();
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const [activeTab, setActiveTab] = useState<"landmarks" | "skies" | "generator" | "saved">("landmarks");
+  // Active Tab: landmarks | skies | ai_generator | saved_art
+  const [activeTab, setActiveTab] = useState<
+    "landmarks" | "skies" | "ai_generator" | "saved_art"
+  >("landmarks");
+
+  // City Search & Filters
   const [search, setSearch] = useState("");
-  const [selectedRegion, setSelectedRegion] = useState<string>("All");
-  const [activeBackgrounds, setActiveBackgrounds] = useState<Record<string, string>>({});
+  const [selectedRegion, setSelectedRegion] = useState("all");
+
+  // Selection & Feedback
+  const [activeCityBg, setActiveCityBg] = useState<Record<string, string>>({});
+  const [currentCity, setCurrentCity] = useState("Bangkok");
   const [toastMessage, setToastMessage] = useState<string | null>(null);
-  const [previewImage, setPreviewImage] = useState<{
+  const [previewArt, setPreviewArt] = useState<{
     url: string;
     title: string;
+    city?: string;
+  } | null>(null);
+
+  // AI Generator state
+  const [genCity, setGenCity] = useState("");
+  const [genPrompt, setGenPrompt] = useState("");
+  const [genMood, setGenMood] = useState("vibrant");
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [genError, setGenError] = useState<string | null>(null);
+  const [paymentTierId, setPaymentTierId] = useState<string | null>(null);
+  const [latestAiArt, setLatestAiArt] = useState<{
+    url: string;
+    prompt: string;
     city: string;
   } | null>(null);
 
-  // Current weather city from storage
-  const [currentCity, setCurrentCity] = useState("Bangkok");
-
-  // Generator states
-  const [genCity, setGenCity] = useState("Bangkok");
-  const [genPrompt, setGenPrompt] = useState("");
-  const [isGenerating, setIsGenerating] = useState(false);
-  const [genError, setGenError] = useState<string | null>(null);
-  const [lastGeneratedUrl, setLastGeneratedUrl] = useState<string | null>(null);
-
-  // Saved/Uploaded artworks state
-  const [savedArts, setSavedArts] = useState<SavedArtItem[]>([]);
-
-  // Ad and Root Beer unlock state tracker
+  // Saved Art items
+  const [savedArtworks, setSavedArtworks] = useState<SavedArtItem[]>([]);
   const [unlockedStateTick, setUnlockedStateTick] = useState(0);
-
-  // Load active city backgrounds and saved library
-  const loadSavedPreferences = () => {
-    const map: Record<string, string> = {};
-    Object.keys(LANDMARK_WATERCOLORS).forEach((city) => {
-      const saved = getSavedCustomArtChoice(city);
-      if (saved) {
-        map[city] = saved;
-      } else {
-        const list = LANDMARK_WATERCOLORS[city];
-        if (list && list.length > 0) {
-          const firstArt = list[0];
-          if (firstArt) map[city] = firstArt;
-        }
-      }
-    });
-    setActiveBackgrounds(map);
-
-    try {
-      const lastCity = localStorage.getItem("weather:last-searched-city");
-      if (lastCity) {
-        setCurrentCity(lastCity);
-        setGenCity(lastCity);
-      }
-    } catch {}
-
-    getAllSavedArtworksFromDB()
-      .then((items) => setSavedArts(items))
-      .catch(() => setSavedArts([]));
-  };
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     loadSavedPreferences();
-  }, []);
+    loadSavedArtworksList();
+  }, [unlockedStateTick]);
+
+  const loadSavedPreferences = () => {
+    try {
+      const city =
+        localStorage.getItem("weather:last-searched-city") ||
+        localStorage.getItem("weather:last-city") ||
+        "Bangkok";
+      setCurrentCity(formatCityName(city));
+
+      const mapping: Record<string, string> = {};
+      Object.keys(LANDMARK_WATERCOLORS).forEach((c) => {
+        const choice = getSavedCustomArtChoice(c);
+        if (choice?.url) mapping[c] = choice.url;
+      });
+      setActiveCityBg(mapping);
+    } catch {}
+  };
+
+  const loadSavedArtworksList = async () => {
+    const list = await getAllSavedArtworksFromDB();
+    setSavedArtworks(list);
+  };
 
   const triggerToast = (msg: string) => {
     setToastMessage(msg);
-    setTimeout(() => setToastMessage(null), 3500);
+    setTimeout(() => {
+      setToastMessage((prev) => (prev === msg ? null : prev));
+    }, 2800);
   };
 
+  // User selects an art background
   const handleSelectArt = (city: string, url: string, title: string) => {
-    const slug = city.toLowerCase().trim();
-    saveCustomArtChoice(slug, url);
-    try {
-      localStorage.setItem(`weather:custom-bg:${slug}`, url);
-      window.dispatchEvent(
-        new CustomEvent("weather:custom-bg-change", { detail: { city: slug, url } })
-      );
-    } catch (err) {
-      console.warn("Could not save to localStorage:", err);
-    }
+    const formatted = formatCityName(city);
+    saveCustomArtChoice(city, url, title);
+    setActiveCityBg((prev) => ({ ...prev, [city]: url }));
 
-    setActiveBackgrounds((prev) => ({ ...prev, [slug]: url }));
-    triggerToast(`Set wallpaper for ${formatCityName(city)}: "${title}"`);
+    try {
+      localStorage.setItem("weather:custom-bg-url", url);
+      localStorage.setItem("weather:custom-bg-city", formatted);
+      localStorage.setItem("weather:last-searched-city", formatted);
+    } catch {}
+
+    window.dispatchEvent(
+      new CustomEvent("weather:custom-bg-change", {
+        detail: { url, city: formatted, title },
+      })
+    );
+    triggerToast(`Applied "${title}" as wallpaper!`);
   };
 
+  // Immediate wallpaper set and navigate back to weather view
   const handleApplyAndView = (city: string, url: string, title: string) => {
     const formatted = formatCityName(city);
     handleSelectArt(city, url, title);
@@ -443,12 +440,9 @@ function ArtGalleryPage() {
     }, 800);
   };
 
-  // Root Beer Trigger Flow
+  // Root Beer Trigger Flow - opens Card/Stripe, Buy Me a Coffee, PayPal, Google Play modal
   const handleTriggerRootBeerTier = (tierId: string) => {
-    window.dispatchEvent(
-      new CustomEvent("weather:trigger-tier-thankyou", { detail: { tierId } })
-    );
-    navigate({ to: "/" });
+    setPaymentTierId(tierId);
   };
 
   // Generator submission with auto-compression to avoid browser localStorage quota crash
@@ -464,349 +458,354 @@ function ArtGalleryPage() {
         data: {
           city: genCity.trim() || currentCity,
           userPrompt: genPrompt.trim(),
-          weatherDesc: "scenic watercolor",
+          mood: genMood,
         },
       });
 
-      if (!res?.imageUrl) {
-        throw new Error("No artwork was returned by the AI generator.");
+      if (!res.success || !res.imageUrl) {
+        throw new Error(res.error || "Failed to generate artwork.");
       }
 
-      // Auto-compress large 3.5MB PNG down to web-optimized JPEG (~150KB)
-      const compressedUrl = await compressDataUrl(res.imageUrl, 1280, 0.85);
+      // Automatically compress PNG base64 down to ~150KB JPEG to protect device storage
+      const compressedUrl = await compressDataUrl(res.imageUrl, 1280, 1280, 0.85);
 
-      const targetCity = genCity.trim() || currentCity;
       const newArt: SavedArtItem = {
-        id: Date.now().toString() + Math.random().toString(36).slice(2, 6),
+        id: `ai_${Date.now()}`,
         url: compressedUrl,
-        label: `${targetCity} — ${genPrompt.trim()}`,
-        date: new Date().toLocaleDateString(),
-        city: targetCity,
-        timestamp: Date.now(),
+        title: `${genCity.trim() || currentCity} (${genMood})`,
+        city: genCity.trim() || currentCity,
+        createdAt: Date.now(),
+        source: "ai",
       };
 
       await saveArtworkToDB(newArt);
-      setSavedArts((prev) => [newArt, ...prev.filter((item) => item.url !== compressedUrl)]);
-      setLastGeneratedUrl(compressedUrl);
+      await loadSavedArtworksList();
 
-      handleSelectArt(targetCity, compressedUrl, newArt.label);
-      triggerToast("✨ AI Watercolor generated and applied to your wallpaper!");
+      setLatestAiArt({
+        url: compressedUrl,
+        prompt: genPrompt.trim(),
+        city: genCity.trim() || currentCity,
+      });
+
+      triggerToast("🎨 Generated new watercolor painting!");
     } catch (err: any) {
-      console.error("AI Generation error:", err);
-      setGenError(err?.message || "Failed to generate artwork. Please try again.");
+      setGenError(err?.message || "Generation failed. Please try again.");
     } finally {
       setIsGenerating(false);
     }
   };
 
-  // Upload photo handler
+  // Upload user photo
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     try {
-      const optimizedUrl = await optimizeImageFile(file);
-      const newArt: SavedArtItem = {
-        id: Date.now().toString() + Math.random().toString(36).slice(2, 6),
-        url: optimizedUrl,
-        label: `${currentCity} — ${file.name.replace(/\.[^/.]+$/, "")}`,
-        date: new Date().toLocaleDateString(),
+      triggerToast("Optimizing photo for wallpaper...");
+      const compressedUrl = await optimizeImageFile(file, 1280, 0.85);
+
+      const uploadItem: SavedArtItem = {
+        id: `upload_${Date.now()}`,
+        url: compressedUrl,
+        title: file.name.replace(/\.[^/.]+$/, "") || "Custom Upload",
         city: currentCity,
-        timestamp: Date.now(),
+        createdAt: Date.now(),
+        source: "upload",
       };
 
-      await saveArtworkToDB(newArt);
-      setSavedArts((prev) => [newArt, ...prev]);
-
-      const targetSlug = currentCity.toLowerCase();
-      handleSelectArt(targetSlug, optimizedUrl, newArt.label);
-      triggerToast("Photo uploaded and set as active wallpaper!");
-    } catch (err) {
-      console.error("Photo upload failed:", err);
-      triggerToast("Could not process this image file.");
+      await saveArtworkToDB(uploadItem);
+      await loadSavedArtworksList();
+      triggerToast("✅ Saved to your personal gallery!");
+    } catch (err: any) {
+      triggerToast("❌ Failed to process upload.");
     } finally {
-      e.target.value = "";
+      if (fileInputRef.current) fileInputRef.current.value = "";
     }
   };
 
-  const handleDeleteSaved = async (id: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    try {
-      await deleteArtworkFromDB(id);
-      setSavedArts((prev) => prev.filter((item) => item.id !== id));
-      triggerToast("Artwork removed from your saved library.");
-    } catch (err) {
-      console.error("Failed to delete art:", err);
-    }
+  const handleDeleteSaved = async (id: string) => {
+    await deleteArtworkFromDB(id);
+    await loadSavedArtworksList();
+    triggerToast("Removed artwork from gallery");
   };
 
   const handleClearAllSaved = async () => {
-    if (window.confirm("Remove all saved artworks from your gallery?")) {
-      try {
-        await clearAllArtworksFromDB();
-        setSavedArts([]);
-        triggerToast("Saved gallery cleared.");
-      } catch (err) {
-        console.error("Failed to clear DB:", err);
-      }
+    if (confirm("Clear all your saved & uploaded art from this device?")) {
+      await clearAllArtworksFromDB();
+      await loadSavedArtworksList();
+      triggerToast("Cleared saved art");
     }
   };
 
+  // Filtered Cities list for Tab 1
+  const allCities = useMemo(() => Object.keys(LANDMARK_WATERCOLORS), []);
+  const regions = useMemo(() => {
+    const set = new Set<string>();
+    Object.values(REGION_MAP).forEach((r) => set.add(r));
+    return ["all", ...Array.from(set)];
+  }, []);
+
   const filteredCities = useMemo(() => {
-    return Object.keys(LANDMARK_WATERCOLORS).filter((cityKey) => {
-      const formatted = formatCityName(cityKey).toLowerCase();
-      const matchesSearch = formatted.includes(search.toLowerCase());
-      if (!matchesSearch) return false;
-      if (selectedRegion === "All") return true;
-      const allowedCities = REGIONS[selectedRegion] || [];
-      return allowedCities.includes(cityKey);
+    return allCities.filter((city) => {
+      const name = formatCityName(city);
+      const matchesSearch =
+        search.trim() === "" ||
+        name.toLowerCase().includes(search.toLowerCase()) ||
+        city.toLowerCase().includes(search.toLowerCase());
+
+      const region = REGION_MAP[city] || "Other";
+      const matchesRegion = selectedRegion === "all" || region === selectedRegion;
+
+      return matchesSearch && matchesRegion;
     });
-  }, [search, selectedRegion]);
+  }, [allCities, search, selectedRegion]);
 
   return (
-    <main className="mx-auto max-w-5xl px-4 py-6 text-foreground sm:px-6">
-      {/* Top Header */}
-      <div className="flex flex-wrap items-center justify-between gap-4 border-b border-border/50 pb-5">
-        <div>
-          <Link
-            to="/"
-            className="inline-flex items-center text-xs font-medium text-muted-foreground hover:underline"
-          >
-            ← {t("back_to_weather", "Back to weather")}
-          </Link>
-          <h1 className="mt-2 text-2xl font-bold tracking-tight sm:text-3xl">
-            🎨 {t("art_gallery", "Art Gallery")}
-          </h1>
-          <p className="mt-1 text-xs text-muted-foreground sm:text-sm">
-            {t(
-              "gallery_subtitle",
-              "Explore city landmark paintings, unlock weather skies, generate AI scenes, or upload custom art."
-            )}
-          </p>
-        </div>
-
-        <Link
-          to="/"
-          className="rounded-full border border-border/70 bg-card px-4 py-1.5 text-xs font-semibold shadow-xs transition-colors hover:bg-accent"
-        >
-          🌤️ {t("view_weather_home", "View Weather")}
-        </Link>
-      </div>
-
-      {/* Floating Success Toast */}
+    <div className="min-h-screen bg-background text-foreground pb-20">
+      {/* Toast Feedback */}
       {toastMessage && (
-        <div className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2 transform rounded-full bg-foreground px-4 py-2 text-xs font-medium text-background shadow-lg transition-all animate-in fade-in">
-          ✨ {toastMessage}
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 rounded-full bg-foreground/90 text-background px-4 py-2 text-xs font-semibold shadow-lg backdrop-blur-sm animate-in fade-in slide-in-from-top-2 duration-200">
+          {toastMessage}
         </div>
       )}
 
-      {/* 4-Tab Segmented Switcher */}
-      <div className="mt-6 grid grid-cols-2 sm:grid-cols-4 gap-1 rounded-xl border border-border/70 bg-card/80 p-1 shadow-xs backdrop-blur-xs">
-        <button
-          type="button"
-          onClick={() => setActiveTab("landmarks")}
-          className={`rounded-lg py-2 text-xs font-semibold transition-all cursor-pointer ${
-            activeTab === "landmarks"
-              ? "bg-foreground text-background shadow-xs"
-              : "text-muted-foreground hover:text-foreground"
-          }`}
-        >
-          🏛️ {t("city_landmarks", "City Landmarks")}
-        </button>
-        <button
-          type="button"
-          onClick={() => setActiveTab("skies")}
-          className={`rounded-lg py-2 text-xs font-semibold transition-all cursor-pointer ${
-            activeTab === "skies"
-              ? "bg-foreground text-background shadow-xs"
-              : "text-muted-foreground hover:text-foreground"
-          }`}
-        >
-          🌤️ Weather Skies
-        </button>
-        <button
-          type="button"
-          onClick={() => setActiveTab("generator")}
-          className={`rounded-lg py-2 text-xs font-semibold transition-all cursor-pointer ${
-            activeTab === "generator"
-              ? "bg-foreground text-background shadow-xs"
-              : "text-muted-foreground hover:text-foreground"
-          }`}
-        >
-          ✨ {t("ai_generator", "AI Generator")}
-        </button>
-        <button
-          type="button"
-          onClick={() => setActiveTab("saved")}
-          className={`rounded-lg py-2 text-xs font-semibold transition-all cursor-pointer ${
-            activeTab === "saved"
-              ? "bg-foreground text-background shadow-xs"
-              : "text-muted-foreground hover:text-foreground"
-          }`}
-        >
-          📁 {t("my_saved_art", "My Saved Art")} ({savedArts.length})
-        </button>
-      </div>
-
-      {/* ======================================================== */}
-      {/* TAB 1: CITY LANDMARKS (33+ Cities)                       */}
-      {/* ======================================================== */}
-      {activeTab === "landmarks" && (
-        <div className="mt-6 space-y-6">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div className="relative w-full sm:max-w-xs">
-              <input
-                type="text"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search city (e.g. Ratchaburi, Tokyo)..."
-                className="w-full rounded-xl border border-border/70 bg-card px-3 py-2 pl-9 text-xs shadow-xs placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
-              />
-              <span className="absolute left-3 top-2.5 text-xs text-muted-foreground">🔍</span>
-              {search && (
-                <button
-                  type="button"
-                  onClick={() => setSearch("")}
-                  className="absolute right-3 top-2.5 text-xs text-muted-foreground hover:text-foreground cursor-pointer"
-                >
-                  ✕
-                </button>
-              )}
-            </div>
-
-            <div className="flex flex-wrap items-center gap-1.5">
-              {["All", ...Object.keys(REGIONS)].map((reg) => (
-                <button
-                  key={reg}
-                  type="button"
-                  onClick={() => setSelectedRegion(reg)}
-                  className={`rounded-full px-3 py-1 text-xs font-medium transition-colors cursor-pointer ${
-                    selectedRegion === reg
-                      ? "bg-foreground text-background"
-                      : "border border-border/60 bg-card text-muted-foreground hover:bg-accent hover:text-foreground"
-                  }`}
-                >
-                  {reg}
-                </button>
-              ))}
-            </div>
+      {/* Top Navigation Bar */}
+      <header className="sticky top-0 z-30 border-b border-border/80 bg-background/90 backdrop-blur-md">
+        <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3">
+          <div className="flex items-center gap-2">
+            <Link
+              to="/"
+              className="flex items-center gap-1.5 rounded-lg border border-border bg-card px-2.5 py-1.5 text-xs font-medium text-foreground transition hover:bg-muted"
+            >
+              ← <span>{t("weather", "Weather")}</span>
+            </Link>
+            <div className="hidden sm:block h-4 w-px bg-border" />
+            <span className="hidden sm:block text-xs font-semibold text-muted-foreground">
+              Current: <strong className="text-foreground">{currentCity}</strong>
+            </span>
           </div>
 
-          <div className="space-y-8">
-            {filteredCities.length === 0 ? (
-              <div className="rounded-2xl border border-dashed border-border/70 p-12 text-center">
-                <p className="text-sm font-medium text-muted-foreground">
-                  No cities found matching "{search}".
-                </p>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSearch("");
-                    setSelectedRegion("All");
-                  }}
-                  className="mt-3 text-xs text-primary underline cursor-pointer"
-                >
-                  Reset filters
-                </button>
-              </div>
-            ) : (
-              filteredCities.map((cityKey) => {
-                const artworks = LANDMARK_WATERCOLORS[cityKey] || [];
-                const activeUrl = activeBackgrounds[cityKey] || artworks[0];
+          <h1 className="text-sm font-bold tracking-tight sm:text-base flex items-center gap-1.5">
+            <span>🎨</span>
+            <span>Art & Wallpaper Gallery</span>
+          </h1>
 
-                return (
-                  <section
-                    key={cityKey}
-                    className="rounded-2xl border border-border/60 bg-card/60 p-4 shadow-xs backdrop-blur-xs sm:p-5"
-                  >
-                    <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/40 pb-3">
-                      <div className="flex items-center gap-2">
-                        <h2 className="text-lg font-bold tracking-tight">
-                          {formatCityName(cityKey)}
-                        </h2>
-                        <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-semibold text-muted-foreground">
-                          {artworks.length} {artworks.length === 1 ? "Artwork" : "Artworks"}
-                        </span>
+          <button
+            type="button"
+            onClick={() => handleOpenCityWeather(currentCity)}
+            className="rounded-lg bg-primary/10 border border-primary/20 px-3 py-1.5 text-xs font-semibold text-primary transition hover:bg-primary hover:text-primary-foreground"
+          >
+            Done
+          </button>
+        </div>
+
+        {/* 4 Unified Gallery Tabs */}
+        <div className="mx-auto max-w-6xl px-4 border-t border-border/60">
+          <div className="flex items-center gap-1.5 overflow-x-auto py-2 text-xs no-scrollbar">
+            <button
+              type="button"
+              onClick={() => setActiveTab("landmarks")}
+              className={`px-3 py-1.5 rounded-lg font-medium whitespace-nowrap transition cursor-pointer flex items-center gap-1.5 ${
+                activeTab === "landmarks"
+                  ? "bg-primary text-primary-foreground font-semibold shadow-xs"
+                  : "bg-muted/60 text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              <span>🏛️</span>
+              <span>City Landmarks ({allCities.length})</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setActiveTab("skies")}
+              className={`px-3 py-1.5 rounded-lg font-medium whitespace-nowrap transition cursor-pointer flex items-center gap-1.5 ${
+                activeTab === "skies"
+                  ? "bg-primary text-primary-foreground font-semibold shadow-xs"
+                  : "bg-muted/60 text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              <span>🌤️</span>
+              <span>Weather Skies & Unlocks</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setActiveTab("ai_generator")}
+              className={`px-3 py-1.5 rounded-lg font-medium whitespace-nowrap transition cursor-pointer flex items-center gap-1.5 ${
+                activeTab === "ai_generator"
+                  ? "bg-primary text-primary-foreground font-semibold shadow-xs"
+                  : "bg-muted/60 text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              <span>✨</span>
+              <span>AI Watercolor Studio</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setActiveTab("saved_art")}
+              className={`px-3 py-1.5 rounded-lg font-medium whitespace-nowrap transition cursor-pointer flex items-center gap-1.5 ${
+                activeTab === "saved_art"
+                  ? "bg-primary text-primary-foreground font-semibold shadow-xs"
+                  : "bg-muted/60 text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              <span>🖼️</span>
+              <span>My Saved & Uploads ({savedArtworks.length})</span>
+            </button>
+          </div>
+        </div>
+      </header>
+
+      <main className="mx-auto max-w-6xl px-4 py-4">
+        {/* ======================================================== */}
+        {/* TAB 1: CITY LANDMARKS CATALOG (33+ Famous Cities)        */}
+        {/* ======================================================== */}
+        {activeTab === "landmarks" && (
+          <div className="space-y-6">
+            <div className="rounded-2xl border border-border/70 bg-card/70 p-4 sm:p-5">
+              <h2 className="text-lg font-bold tracking-tight">🏛️ Famous City Landmark Watercolors</h2>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Browse hand-painted watercolor landmarks for 33+ world cities. Tapping "Set Active" immediately updates your home screen wallpaper.
+              </p>
+
+              {/* Search & Region Filter */}
+              <div className="mt-4 flex flex-col sm:flex-row gap-2.5">
+                <input
+                  type="text"
+                  placeholder="Search city (e.g. Ratchaburi, Tokyo, Paris)..."
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  className="flex-1 rounded-xl border border-border bg-background px-3.5 py-2 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+                />
+
+                <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0">
+                  {regions.map((reg) => (
+                    <button
+                      key={reg}
+                      type="button"
+                      onClick={() => setSelectedRegion(reg)}
+                      className={`px-2.5 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition cursor-pointer capitalize ${
+                        selectedRegion === reg
+                          ? "bg-primary text-primary-foreground font-semibold shadow-xs"
+                          : "bg-muted text-muted-foreground hover:text-foreground"
+                      }`}
+                    >
+                      {reg === "all" ? "All Regions" : reg}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* City Landmark Cards */}
+            <div className="space-y-8">
+              {filteredCities.length === 0 ? (
+                <div className="rounded-2xl border border-dashed border-border p-12 text-center text-xs text-muted-foreground">
+                  No cities found matching "{search}".
+                </div>
+              ) : (
+                filteredCities.map((cityKey) => {
+                  const cityName = formatCityName(cityKey);
+                  const artworks = LANDMARK_WATERCOLORS[cityKey] || [];
+                  const titles = LANDMARK_TITLES[cityKey] || [];
+                  const activeUrl = activeCityBg[cityKey] || artworks[0];
+                  const region = REGION_MAP[cityKey] || "Global";
+
+                  return (
+                    <section
+                      key={cityKey}
+                      className="rounded-2xl border border-border/80 bg-card/60 p-4 sm:p-5 transition hover:border-border"
+                    >
+                      <div className="mb-3.5 flex flex-wrap items-center justify-between gap-2 border-b border-border/50 pb-2.5">
+                        <div className="flex items-center gap-2">
+                          <h3 className="text-base font-bold tracking-tight text-foreground">
+                            {cityName}
+                          </h3>
+                          <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
+                            {region}
+                          </span>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => handleOpenCityWeather(cityKey)}
+                            className="rounded-lg bg-primary/10 border border-primary/20 px-2.5 py-1 text-xs font-semibold text-primary transition hover:bg-primary hover:text-primary-foreground"
+                          >
+                            🌤️ View Weather
+                          </button>
+                        </div>
                       </div>
 
-                      <button
-                        type="button"
-                        onClick={() => handleOpenCityWeather(cityKey)}
-                        className="inline-flex items-center gap-1 rounded-lg border border-border/60 bg-background px-2.5 py-1 text-xs font-medium transition-colors hover:bg-accent cursor-pointer"
-                      >
-                        <span>🌤️</span>
-                        <span>View Weather</span>
-                      </button>
-                    </div>
+                      {/* Artworks Grid */}
+                      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
+                        {artworks.map((url, idx) => {
+                          const title = titles[idx] || `${cityName} Scene ${idx + 1}`;
+                          const isActive = activeUrl === url;
 
-                    <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
-                      {artworks.map((url, index) => {
-                        const isActive = activeUrl === url;
-                        const title =
-                          LANDMARK_TITLES[url] || `${formatCityName(cityKey)} View #${index + 1}`;
+                          return (
+                            <div
+                              key={url}
+                              className={`group relative flex flex-col overflow-hidden rounded-xl border bg-card transition ${
+                                isActive
+                                  ? "border-primary ring-2 ring-primary/40 shadow-md"
+                                  : "border-border/80 hover:border-primary/50"
+                              }`}
+                            >
+                              <div className="relative aspect-4/3 w-full overflow-hidden bg-muted">
+                                <img
+                                  src={url}
+                                  alt={title}
+                                  loading="lazy"
+                                  className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                                />
 
-                        return (
-                          <div
-                            key={url + index}
-                            className={`group relative flex flex-col overflow-hidden rounded-xl border transition-all ${
-                              isActive
-                                ? "border-primary ring-2 ring-primary/40 shadow-sm"
-                                : "border-border/60 hover:border-border hover:shadow-xs"
-                            }`}
-                          >
-                            <div className="relative aspect-4/3 w-full overflow-hidden bg-muted">
-                              <img
-                                src={url}
-                                alt={title}
-                                loading="lazy"
-                                className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
-                              />
+                                {isActive && (
+                                  <div className="absolute top-1.5 left-1.5 rounded-full bg-primary px-2 py-0.5 text-[9px] font-bold text-primary-foreground shadow-xs">
+                                    Active
+                                  </div>
+                                )}
 
-                              {isActive && (
-                                <span className="absolute left-2 top-2 rounded-full bg-primary px-2 py-0.5 text-[10px] font-bold text-primary-foreground shadow-xs">
-                                  ✓ Active
+                                {/* Touch & Click Zoom Preview Button */}
+                                <button
+                                  type="button"
+                                  onClick={() => setPreviewArt({ url, title, city: cityName })}
+                                  aria-label="Preview full size"
+                                  className="absolute top-1.5 right-1.5 rounded-full bg-black/60 p-1 text-white opacity-85 sm:opacity-0 sm:group-hover:opacity-100 transition"
+                                >
+                                  🔍
+                                </button>
+                              </div>
+
+                              <div className="p-2 flex-1 flex flex-col justify-between">
+                                <span className="text-[11px] font-medium text-foreground line-clamp-1">
+                                  {title}
                                 </span>
-                              )}
 
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setPreviewImage({ url, title, city: formatCityName(cityKey) });
-                                }}
-                                className="absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-full bg-black/60 text-white opacity-85 sm:opacity-0 sm:group-hover:opacity-100 backdrop-blur-xs transition-opacity cursor-pointer"
-                                title="Expand preview"
-                              >
-                                🔍
-                              </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleSelectArt(cityKey, url, title)}
+                                  className={`mt-1.5 w-full rounded-lg py-1 text-[11px] font-semibold transition cursor-pointer ${
+                                    isActive
+                                      ? "bg-muted text-muted-foreground cursor-default"
+                                      : "bg-primary/10 text-primary hover:bg-primary hover:text-primary-foreground"
+                                  }`}
+                                >
+                                  {isActive ? "Selected" : "Set Active"}
+                                </button>
+                              </div>
                             </div>
-
-                            <div className="flex flex-1 flex-col justify-between bg-card p-2.5 text-xs">
-                              <p className="line-clamp-1 font-medium text-foreground">{title}</p>
-
-                              <button
-                                type="button"
-                                onClick={() => handleSelectArt(cityKey, url, title)}
-                                className={`mt-2 w-full rounded-md py-1 text-center font-medium transition-colors cursor-pointer ${
-                                  isActive
-                                    ? "bg-muted text-muted-foreground cursor-default"
-                                    : "bg-primary/10 text-primary hover:bg-primary hover:text-primary-foreground"
-                                }`}
-                              >
-                                {isActive ? "Selected" : "Set Active"}
-                              </button>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </section>
-                );
-              })
-            )}
+                          );
+                        })}
+                      </div>
+                    </section>
+                  );
+                })
+              )}
+            </div>
           </div>
-        </div>
-      )}
+        )}
       {/* ======================================================== */}
       {/* TAB 2: WEATHER SKIES & UNLOCKS (Free, Ads 24h, Root Beer) */}
       {/* ======================================================== */}
@@ -833,9 +832,9 @@ function ArtGalleryPage() {
               const isAccessible =
                 sky.category === "free" ||
                 (sky.category === "ads_24h" && isAdUnlockedBg) ||
-                (sky.category === "premium" && isThankYouUnlocked);
+                (sky.category === "rootbeer_tier" && isThankYouUnlocked);
 
-              const isActiveWallpaper = activeBackgrounds[currentCity.toLowerCase()] === sky.url;
+              const isActiveWallpaper = activeCityBg[currentCity.toLowerCase()] === sky.previewUrl;
 
               return (
                 <div
@@ -844,8 +843,8 @@ function ArtGalleryPage() {
                 >
                   <div className="relative aspect-16/10 w-full overflow-hidden bg-muted">
                     <img
-                      src={sky.url}
-                      alt={sky.title}
+                      src={sky.previewUrl}
+                      alt={sky.name}
                       loading="lazy"
                       className="h-full w-full object-cover transition-transform duration-300 hover:scale-105"
                     />
@@ -884,7 +883,7 @@ function ArtGalleryPage() {
 
                   <div className="flex flex-1 flex-col justify-between p-3.5 space-y-3">
                     <div>
-                      <h3 className="text-sm font-bold text-foreground">{sky.title}</h3>
+                      <h3 className="text-sm font-bold text-foreground">{sky.name}</h3>
                       <p className="mt-1 text-xs text-muted-foreground">{sky.description}</p>
                     </div>
 
@@ -892,7 +891,7 @@ function ArtGalleryPage() {
                       {isAccessible ? (
                         <button
                           type="button"
-                          onClick={() => handleSelectArt(currentCity.toLowerCase(), sky.url, sky.title)}
+                          onClick={() => handleSelectArt(currentCity.toLowerCase(), sky.previewUrl, sky.name)}
                           className={`w-full py-2 rounded-xl text-xs font-semibold transition cursor-pointer ${
                             isActiveWallpaper
                               ? "bg-muted text-muted-foreground cursor-default"
@@ -904,7 +903,7 @@ function ArtGalleryPage() {
                       ) : sky.category === "ads_24h" ? (
                         <button
                           type="button"
-                          onClick={() => handleWatchAdUnlock(sky.id, sky.title)}
+                          onClick={() => handleWatchAdUnlock(sky.id, sky.name)}
                           className="w-full py-2 rounded-xl bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 text-white text-xs font-bold shadow-xs transition cursor-pointer flex items-center justify-center gap-1.5"
                         >
                           <span>📺</span>
@@ -938,7 +937,7 @@ function ArtGalleryPage() {
       {/* ======================================================== */}
       {/* TAB 3: AI WATERCOLOR GENERATOR                           */}
       {/* ======================================================== */}
-      {activeTab === "generator" && (
+      {activeTab === "ai_generator" && (
         <div className="mt-6 rounded-2xl border border-border/70 bg-card/70 p-5 shadow-xs sm:p-7">
           <div className="max-w-2xl">
             <h2 className="text-xl font-bold tracking-tight">✨ Paint a Custom Weather Scene</h2>
@@ -976,7 +975,12 @@ function ArtGalleryPage() {
               <div>
                 <span className="text-[11px] font-medium text-muted-foreground">Quick inspiration presets:</span>
                 <div className="mt-1.5 flex flex-wrap gap-1.5">
-                  {MOOD_PRESETS.map((preset) => (
+                  {[
+                    "Sunset reflection over quiet waters",
+                    "Thunderstorm clouds rolling over ancient pagodas",
+                    "Crisp morning mountain mist with autumn colors",
+                    "Cozy rain-dappled cobblestone street with lanterns",
+                  ].map((preset) => (
                     <button
                       key={preset}
                       type="button"
@@ -1014,12 +1018,12 @@ function ArtGalleryPage() {
               </button>
             </form>
 
-            {lastGeneratedUrl && (
+            {latestAiArt && (
               <div className="mt-8 rounded-2xl border border-primary/40 bg-accent/30 p-4">
                 <span className="text-xs font-bold text-primary">✨ Latest Painting:</span>
                 <div className="mt-2 aspect-16/9 overflow-hidden rounded-xl border border-border bg-muted">
                   <img
-                    src={lastGeneratedUrl}
+                    src={latestAiArt.url}
                     alt="Generated watercolor"
                     className="h-full w-full object-cover"
                   />
@@ -1031,9 +1035,9 @@ function ArtGalleryPage() {
                       type="button"
                       onClick={() =>
                         handleSelectArt(
-                          (genCity.trim() || currentCity).toLowerCase(),
-                          lastGeneratedUrl,
-                          `${genCity.trim() || currentCity} — ${genPrompt}`
+                          latestAiArt.city.toLowerCase(),
+                          latestAiArt.url,
+                          `${latestAiArt.city} — ${latestAiArt.prompt}`
                         )
                       }
                       className="rounded-lg border border-border/80 bg-background px-3 py-1.5 text-xs font-semibold text-foreground hover:bg-accent cursor-pointer"
@@ -1044,9 +1048,9 @@ function ArtGalleryPage() {
                       type="button"
                       onClick={() =>
                         handleApplyAndView(
-                          genCity.trim() || currentCity,
-                          lastGeneratedUrl,
-                          `${genCity.trim() || currentCity} — ${genPrompt}`
+                          latestAiArt.city,
+                          latestAiArt.url,
+                          `${latestAiArt.city} — ${latestAiArt.prompt}`
                         )
                       }
                       className="rounded-lg bg-primary px-3.5 py-1.5 text-xs font-bold text-primary-foreground shadow-xs hover:bg-primary/90 cursor-pointer"
@@ -1064,7 +1068,7 @@ function ArtGalleryPage() {
       {/* ======================================================== */}
       {/* TAB 4: MY SAVED & UPLOADED ART (IndexedDB)               */}
       {/* ======================================================== */}
-      {activeTab === "saved" && (
+      {activeTab === "saved_art" && (
         <div className="mt-6 space-y-6">
           <input
             type="file"
@@ -1092,7 +1096,7 @@ function ArtGalleryPage() {
                 <span>Upload Photo</span>
               </button>
 
-              {savedArts.length > 0 && (
+              {savedArtworks.length > 0 && (
                 <button
                   type="button"
                   onClick={handleClearAllSaved}
@@ -1104,7 +1108,7 @@ function ArtGalleryPage() {
             </div>
           </div>
 
-          {savedArts.length === 0 ? (
+          {savedArtworks.length === 0 ? (
             <div className="rounded-2xl border border-dashed border-border/70 p-12 text-center">
               <span className="text-3xl">🖼️</span>
               <p className="mt-2 text-sm font-semibold">No saved art yet</p>
@@ -1114,7 +1118,7 @@ function ArtGalleryPage() {
               <div className="mt-4 flex justify-center gap-2">
                 <button
                   type="button"
-                  onClick={() => setActiveTab("generator")}
+                  onClick={() => setActiveTab("ai_generator")}
                   className="rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground hover:bg-primary/90 cursor-pointer"
                 >
                   Generate AI Art
@@ -1130,7 +1134,7 @@ function ArtGalleryPage() {
             </div>
           ) : (
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
-              {savedArts.map((item) => (
+              {savedArtworks.map((item) => (
                 <div
                   key={item.id}
                   className="group relative flex flex-col overflow-hidden rounded-xl border border-border/70 bg-card transition-all hover:shadow-xs"
@@ -1138,17 +1142,17 @@ function ArtGalleryPage() {
                   <div className="relative aspect-4/3 w-full overflow-hidden bg-muted">
                     <img
                       src={item.url}
-                      alt={item.label}
+                      alt={item.title}
                       className="h-full w-full object-cover"
                     />
 
-                    {/* Mobile-friendly always visible preview button, hover on desktop */}
+                    {/* Mobile-friendly preview button */}
                     <button
                       type="button"
                       onClick={() =>
-                        setPreviewImage({
+                        setPreviewArt({
                           url: item.url,
-                          title: item.label,
+                          title: item.title,
                           city: item.city || currentCity,
                         })
                       }
@@ -1161,8 +1165,10 @@ function ArtGalleryPage() {
 
                   <div className="flex flex-1 flex-col justify-between p-2.5 text-xs">
                     <div>
-                      <p className="line-clamp-1 font-semibold">{item.label}</p>
-                      <p className="text-[10px] text-muted-foreground">{item.date}</p>
+                      <p className="line-clamp-1 font-semibold">{item.title}</p>
+                      <p className="text-[10px] text-muted-foreground">
+                        {new Date(item.createdAt).toLocaleDateString()}
+                      </p>
                     </div>
 
                     <div className="mt-2 flex items-center gap-1.5">
@@ -1172,7 +1178,7 @@ function ArtGalleryPage() {
                           handleSelectArt(
                             (item.city || currentCity).toLowerCase(),
                             item.url,
-                            item.label
+                            item.title
                           )
                         }
                         className="flex-1 rounded-md bg-primary/10 py-1 text-center font-medium text-primary hover:bg-primary hover:text-primary-foreground cursor-pointer"
@@ -1182,7 +1188,7 @@ function ArtGalleryPage() {
 
                       <button
                         type="button"
-                        onClick={(e) => handleDeleteSaved(item.id, e)}
+                        onClick={() => handleDeleteSaved(item.id)}
                         className="rounded-md border border-destructive/40 p-1 text-destructive hover:bg-destructive/10 cursor-pointer"
                         title="Delete"
                       >
@@ -1198,24 +1204,24 @@ function ArtGalleryPage() {
       )}
 
       {/* Fullscreen Zoom Preview Modal */}
-      {previewImage && (
+      {previewArt && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm animate-in fade-in"
-          onClick={() => setPreviewImage(null)}
+          onClick={() => setPreviewArt(null)}
         >
           <div
             className="relative max-h-[90vh] max-w-3xl overflow-hidden rounded-2xl bg-card shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           >
             <img
-              src={previewImage.url}
-              alt={previewImage.title}
+              src={previewArt.url}
+              alt={previewArt.title}
               className="max-h-[75vh] w-full object-contain"
             />
             <div className="flex items-center justify-between border-t border-border/50 p-4">
               <div>
-                <p className="text-sm font-bold">{previewImage.title}</p>
-                <p className="text-xs text-muted-foreground">{previewImage.city}</p>
+                <p className="text-sm font-bold">{previewArt.title}</p>
+                <p className="text-xs text-muted-foreground">{previewArt.city}</p>
               </div>
 
               <div className="flex items-center gap-2">
@@ -1223,11 +1229,11 @@ function ArtGalleryPage() {
                   type="button"
                   onClick={() => {
                     handleSelectArt(
-                      previewImage.city.toLowerCase(),
-                      previewImage.url,
-                      previewImage.title
+                      (previewArt.city || currentCity).toLowerCase(),
+                      previewArt.url,
+                      previewArt.title
                     );
-                    setPreviewImage(null);
+                    setPreviewArt(null);
                   }}
                   className="rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground hover:bg-primary/90 cursor-pointer"
                 >
@@ -1236,7 +1242,7 @@ function ArtGalleryPage() {
 
                 <button
                   type="button"
-                  onClick={() => setPreviewImage(null)}
+                  onClick={() => setPreviewArt(null)}
                   className="rounded-lg border border-border px-3 py-1.5 text-xs font-medium hover:bg-muted cursor-pointer"
                 >
                   Close
@@ -1245,6 +1251,18 @@ function ArtGalleryPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Payment Selection Modal (Card/Stripe, Buy Me a Coffee, PayPal, Google Play) */}
+      {paymentTierId && (
+        <PaymentModal
+          tierId={paymentTierId}
+          onClose={() => setPaymentTierId(null)}
+          onSuccess={() => {
+            setUnlockedStateTick((prev) => prev + 1);
+            triggerToast("🎉 Root Beer Tier Unlocked! Thank you for supporting!");
+          }}
+        />
       )}
     </main>
   );
