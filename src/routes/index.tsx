@@ -54,6 +54,26 @@ const DEFAULT_PLACE: Place = {
   lon: 100.5018,
 };
 
+const LAST_PLACE_KEY = "weather:last-place";
+
+function loadLastPlace(): Place | null {
+  try {
+    const raw = localStorage.getItem(LAST_PLACE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (parsed && typeof parsed.lat === "number" && typeof parsed.lon === "number" && parsed.name) {
+      return parsed as Place;
+    }
+  } catch {}
+  return null;
+}
+
+function saveLastPlace(p: Place): void {
+  try {
+    localStorage.setItem(LAST_PLACE_KEY, JSON.stringify(p));
+  } catch {}
+}
+
 // Fetch USGS Significant Earthquakes (M4.5+ within 1,200km)
 async function fetchUSGSEarthquakes(lat: number, lon: number): Promise<TickerAlertItem[]> {
   try {
@@ -319,7 +339,7 @@ function Index() {
     }
   };
 
-  // Check if user came back from Art Gallery with a selected city
+  // Check if user came back from Art Gallery with a selected city, or restore last visited city
   useEffect(() => {
     try {
       const galleryCity = localStorage.getItem("weather:last-searched-city");
@@ -331,6 +351,13 @@ function Index() {
             handleSelectPlace(firstResult);
           }
         });
+        return;
+      }
+
+      // Restore last visited city if saved
+      const savedPlace = loadLastPlace();
+      if (savedPlace && !isSamePlace(savedPlace, DEFAULT_PLACE)) {
+        setPlace(savedPlace);
       }
     } catch {}
   }, []);
@@ -402,6 +429,7 @@ function Index() {
 
   const handleSelectPlace = (newPlace: Place) => {
     setPlace(newPlace);
+    saveLastPlace(newPlace);
     setQuery("");
     setSuggestions([]);
   };
