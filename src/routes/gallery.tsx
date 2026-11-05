@@ -1265,6 +1265,7 @@ export function ArtGalleryPage() {
         />
       )}
     </main>
+    </div>
   );
 }
 
