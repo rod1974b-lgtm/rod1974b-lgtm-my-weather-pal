@@ -25,6 +25,7 @@ import {
   unlockWithAd24h,
   getAllUnlockedThankYouBackgrounds,
 } from "@/lib/monetization";
+import { getTmdAlertsFn } from "@/lib/tmdAlerts.functions";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -115,7 +116,7 @@ async function fetchUSGSEarthquakes(lat: number, lon: number): Promise<TickerAle
   }
 }
 
-// Fetch TMD (Thailand Meteorological Department) Warnings
+// Fetch TMD (Thailand Meteorological Department) Warnings via server proxy
 async function fetchTMDWarnings(place: Place): Promise<TickerAlertItem[]> {
   const isThailand =
     place.country?.toLowerCase().includes("thailand") ||
@@ -124,23 +125,8 @@ async function fetchTMDWarnings(place: Place): Promise<TickerAlertItem[]> {
   if (!isThailand) return [];
 
   try {
-    const res = await fetch(
-      "https://data.tmd.go.th/api/WeatherWarningNews/v1/?uid=api&ukey=api1234&format=json",
-      { signal: AbortSignal.timeout(3500) }
-    );
-    if (!res.ok) return [];
-    const data = await res.json();
-    const warnings = data.WarningNews || [];
-    const now = Date.now();
-
-    return warnings.slice(0, 2).map((w: any, idx: number) => ({
-      id: `tmd-${idx}-${now}`,
-      severity: "warning",
-      category: "storm",
-      headline: `TMD Advisory: ${w.TitleEnglish || w.TitleThai || "Heavy Rain / High Waves Warning"}`,
-      source: "TMD",
-      timeAgo: "Active",
-    }));
+    const alerts = await getTmdAlertsFn();
+    return alerts || [];
   } catch {
     return [];
   }
