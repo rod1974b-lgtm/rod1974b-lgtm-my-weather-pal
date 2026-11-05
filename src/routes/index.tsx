@@ -430,20 +430,51 @@ function Index() {
     saveFavorites(updated);
   };
 
-  // Reverse geocoding HTML5 GPS
+  // Reverse geocoding HTML5 GPS with automatic IP fallback
   const handleUseCurrentLocation = () => {
+    setLoading(true);
+    setError(null);
+
+    // Fallback: IP-based city detection if GPS is blocked or unavailable
+    const fallbackToIp = async () => {
+      try {
+        const res = await fetch("https://get.geojs.io/v1/ip/geo.json", {
+          signal: AbortSignal.timeout(4000),
+        });
+        if (res.ok) {
+          const data = await res.json();
+          const lat = parseFloat(data.latitude);
+          const lon = parseFloat(data.longitude);
+          const cityName = data.city || data.region || "Current Location";
+          const countryName = data.country || "";
+
+          if (!isNaN(lat) && !isNaN(lon)) {
+            handleSelectPlace({
+              name: cityName,
+              country: countryName,
+              lat,
+              lon,
+            });
+            return;
+          }
+        }
+      } catch {}
+      setLoading(false);
+      setError("Unable to determine location. Please search for your city above.");
+    };
+
     if (!navigator.geolocation) {
-      setError("Geolocation is not supported by your browser");
+      fallbackToIp();
       return;
     }
 
-    setLoading(true);
     navigator.geolocation.getCurrentPosition(
       async (pos) => {
         const { latitude, longitude } = pos.coords;
         try {
           const res = await fetch(
-            `https://photon.komoot.io/reverse?lat=${latitude}&lon=${longitude}`
+            `https://photon.komoot.io/reverse?lat=${latitude}&lon=${longitude}`,
+            { signal: AbortSignal.timeout(4000) }
           );
           if (res.ok) {
             const data = await res.json();
@@ -469,11 +500,15 @@ function Index() {
           lon: longitude,
         });
       },
-      (err) => {
-        setLoading(false);
-        setError(`Unable to retrieve your location: ${err.message}`);
+      () => {
+        // If GPS is disabled, denied, or timed out, seamlessly fall back to IP
+        fallbackToIp();
       },
-      { timeout: 8000 }
+      {
+        enableHighAccuracy: false, // Fast Wi-Fi / cellular fix
+        timeout: 10000,
+        maximumAge: 300000, // Use cached position if available within 5 mins
+      }
     );
   };
 
@@ -559,7 +594,7 @@ function Index() {
               type="button"
               onClick={handleUseCurrentLocation}
               title={t("use_location", "Use GPS Location")}
-              className="flex h-10 w-10 items-center justify-center rounded-2xl border border-border/60 bg-card/80 text-foreground shadow-xs hover:bg-muted/80 backdrop-blur-xs transition"
+              className="flex h-10 w-10 items-center justify-center rounded-2xl border border-border/60 bg-card/80 text-foreground shadow-xs hover:bg-muted/80 backdrop-blur-xs transition cursor-pointer"
             >
               <span className="text-base select-none">📍</span>
             </button>
@@ -573,7 +608,7 @@ function Index() {
                   key={`${s.name}-${s.lat}-${idx}`}
                   type="button"
                   onClick={() => handleSelectPlace(s)}
-                  className="flex w-full items-center justify-between rounded-xl px-3 py-2 text-left text-sm hover:bg-muted/80 transition"
+                  className="flex w-full items-center justify-between rounded-xl px-3 py-2 text-left text-sm hover:bg-muted/80 transition cursor-pointer"
                 >
                   <span className="font-medium text-foreground">{s.name}</span>
                   <span className="text-xs text-muted-foreground">{s.country}</span>
@@ -660,7 +695,7 @@ function Index() {
             <button
               onClick={() => setPurchasedTierId(null)}
               aria-label="Close"
-              className="absolute -top-3 -right-3 bg-white text-zinc-700 hover:text-black rounded-full w-8 h-8 flex items-center justify-center shadow-lg font-bold text-sm transition hover:scale-105"
+              className="absolute -top-3 -right-3 bg-white text-zinc-700 hover:text-black rounded-full w-8 h-8 flex items-center justify-center shadow-lg font-bold text-sm transition hover:scale-105 cursor-pointer"
             >
               ✕
             </button>
