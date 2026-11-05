@@ -807,3 +807,447 @@ function ArtGalleryPage() {
           </div>
         </div>
       )}
+      {/* ======================================================== */}
+      {/* TAB 2: WEATHER SKIES & UNLOCKS (Free, Ads 24h, Root Beer) */}
+      {/* ======================================================== */}
+      {activeTab === "skies" && (
+        <div className="mt-6 space-y-6">
+          <div className="rounded-2xl border border-border/70 bg-card/70 p-4 sm:p-5">
+            <h2 className="text-lg font-bold tracking-tight">🌤️ Atmospheric Weather Skies</h2>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Core weather sky backgrounds that react to live weather conditions or can be pinned as your active city wallpaper.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+            {WEATHER_SKIES.map((sky) => {
+              const isAdUnlockedBg = isAdUnlocked(sky.id);
+              const isThankYouUnlocked =
+                sky.id === "haze"
+                  ? isThankYouBackgroundUnlocked("large_root_beer_tier") ||
+                    isThankYouBackgroundUnlocked("party_pack_root_beer_tier")
+                  : sky.id === "storm"
+                  ? isThankYouBackgroundUnlocked("party_pack_root_beer_tier")
+                  : true;
+
+              const isAccessible =
+                sky.category === "free" ||
+                (sky.category === "ads_24h" && isAdUnlockedBg) ||
+                (sky.category === "premium" && isThankYouUnlocked);
+
+              const isActiveWallpaper = activeBackgrounds[currentCity.toLowerCase()] === sky.url;
+
+              return (
+                <div
+                  key={sky.id}
+                  className="flex flex-col overflow-hidden rounded-2xl border border-border/70 bg-card shadow-xs transition-all hover:shadow-md"
+                >
+                  <div className="relative aspect-16/10 w-full overflow-hidden bg-muted">
+                    <img
+                      src={sky.url}
+                      alt={sky.title}
+                      loading="lazy"
+                      className="h-full w-full object-cover transition-transform duration-300 hover:scale-105"
+                    />
+
+                    {/* Category Ribbon */}
+                    <span
+                      className={`absolute left-2.5 top-2.5 rounded-full px-2 py-0.5 text-[10px] font-bold shadow-xs ${
+                        sky.category === "free"
+                          ? "bg-emerald-600 text-white"
+                          : sky.category === "ads_24h"
+                          ? isAdUnlockedBg
+                            ? "bg-blue-600 text-white"
+                            : "bg-amber-600 text-white"
+                          : isThankYouUnlocked
+                          ? "bg-purple-600 text-white"
+                          : "bg-amber-800 text-white"
+                      }`}
+                    >
+                      {sky.category === "free"
+                        ? "Free Forever"
+                        : sky.category === "ads_24h"
+                        ? isAdUnlockedBg
+                          ? "✓ 24h Active"
+                          : "📺 Watch Ad (24h)"
+                        : isThankYouUnlocked
+                        ? "✓ Unlocked Forever"
+                        : "🍺 Root Beer Tier"}
+                    </span>
+
+                    {isActiveWallpaper && (
+                      <span className="absolute right-2.5 top-2.5 rounded-full bg-primary px-2 py-0.5 text-[10px] font-bold text-primary-foreground shadow-xs">
+                        Active on {currentCity}
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="flex flex-1 flex-col justify-between p-3.5 space-y-3">
+                    <div>
+                      <h3 className="text-sm font-bold text-foreground">{sky.title}</h3>
+                      <p className="mt-1 text-xs text-muted-foreground">{sky.description}</p>
+                    </div>
+
+                    <div className="pt-2 border-t border-border/50">
+                      {isAccessible ? (
+                        <button
+                          type="button"
+                          onClick={() => handleSelectArt(currentCity.toLowerCase(), sky.url, sky.title)}
+                          className={`w-full py-2 rounded-xl text-xs font-semibold transition cursor-pointer ${
+                            isActiveWallpaper
+                              ? "bg-muted text-muted-foreground cursor-default"
+                              : "bg-primary text-primary-foreground hover:bg-primary/90"
+                          }`}
+                        >
+                          {isActiveWallpaper ? "Active Wallpaper" : `Set for ${currentCity}`}
+                        </button>
+                      ) : sky.category === "ads_24h" ? (
+                        <button
+                          type="button"
+                          onClick={() => handleWatchAdUnlock(sky.id, sky.title)}
+                          className="w-full py-2 rounded-xl bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 text-white text-xs font-bold shadow-xs transition cursor-pointer flex items-center justify-center gap-1.5"
+                        >
+                          <span>📺</span>
+                          <span>Watch Ad (Unlock for 24h)</span>
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            handleTriggerRootBeerTier(
+                              sky.id === "storm"
+                                ? "party_pack_root_beer_tier"
+                                : "large_root_beer_tier"
+                            )
+                          }
+                          className="w-full py-2 rounded-xl bg-gradient-to-r from-amber-700 to-amber-900 hover:from-amber-600 hover:to-amber-800 text-white text-xs font-bold shadow-xs transition cursor-pointer flex items-center justify-center gap-1.5"
+                        >
+                          <span>🍺</span>
+                          <span>Unlock via Root Beer</span>
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* ======================================================== */}
+      {/* TAB 3: AI WATERCOLOR GENERATOR                           */}
+      {/* ======================================================== */}
+      {activeTab === "generator" && (
+        <div className="mt-6 rounded-2xl border border-border/70 bg-card/70 p-5 shadow-xs sm:p-7">
+          <div className="max-w-2xl">
+            <h2 className="text-xl font-bold tracking-tight">✨ Paint a Custom Weather Scene</h2>
+            <p className="mt-1 text-xs text-muted-foreground sm:text-sm">
+              Describe your scene and AI Gateway will paint a unique hand-crafted watercolor for your forecast.
+            </p>
+
+            <form onSubmit={handleGenerate} className="mt-5 space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-foreground">City or Landmark</label>
+                <input
+                  type="text"
+                  value={genCity}
+                  onChange={(e) => setGenCity(e.target.value)}
+                  placeholder="e.g. Ratchaburi, Tokyo, Paris..."
+                  className="mt-1.5 w-full rounded-xl border border-border/70 bg-background px-3 py-2 text-xs shadow-xs focus:outline-none focus:ring-2 focus:ring-primary/40"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-foreground">
+                  Atmospheric Scene or Weather Description
+                </label>
+                <textarea
+                  value={genPrompt}
+                  onChange={(e) => setGenPrompt(e.target.value)}
+                  rows={3}
+                  placeholder="e.g. Golden sunset over the river with warm reflections and distant mountains..."
+                  className="mt-1.5 w-full rounded-xl border border-border/70 bg-background px-3 py-2 text-xs shadow-xs focus:outline-none focus:ring-2 focus:ring-primary/40"
+                  required
+                />
+              </div>
+
+              <div>
+                <span className="text-[11px] font-medium text-muted-foreground">Quick inspiration presets:</span>
+                <div className="mt-1.5 flex flex-wrap gap-1.5">
+                  {MOOD_PRESETS.map((preset) => (
+                    <button
+                      key={preset}
+                      type="button"
+                      onClick={() => setGenPrompt(preset)}
+                      className="rounded-full border border-border/60 bg-card px-2.5 py-1 text-[11px] text-muted-foreground hover:bg-accent hover:text-foreground cursor-pointer"
+                    >
+                      + {preset}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {genError && (
+                <div className="rounded-xl border border-destructive/30 bg-destructive/10 p-3 text-xs text-destructive">
+                  ⚠️ {genError}
+                </div>
+              )}
+
+              <button
+                type="submit"
+                disabled={isGenerating || !genPrompt.trim()}
+                className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-primary py-2.5 text-xs font-semibold text-primary-foreground shadow-sm transition-all hover:bg-primary/90 disabled:opacity-50 sm:w-auto sm:px-6 cursor-pointer"
+              >
+                {isGenerating ? (
+                  <>
+                    <span className="h-3 w-3 animate-spin rounded-full border-2 border-primary-foreground border-t-transparent" />
+                    <span>Painting scene with AI...</span>
+                  </>
+                ) : (
+                  <>
+                    <span>🎨</span>
+                    <span>Generate Artwork</span>
+                  </>
+                )}
+              </button>
+            </form>
+
+            {lastGeneratedUrl && (
+              <div className="mt-8 rounded-2xl border border-primary/40 bg-accent/30 p-4">
+                <span className="text-xs font-bold text-primary">✨ Latest Painting:</span>
+                <div className="mt-2 aspect-16/9 overflow-hidden rounded-xl border border-border bg-muted">
+                  <img
+                    src={lastGeneratedUrl}
+                    alt="Generated watercolor"
+                    className="h-full w-full object-cover"
+                  />
+                </div>
+                <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+                  <span className="text-xs text-muted-foreground">Saved to on-device library</span>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        handleSelectArt(
+                          (genCity.trim() || currentCity).toLowerCase(),
+                          lastGeneratedUrl,
+                          `${genCity.trim() || currentCity} — ${genPrompt}`
+                        )
+                      }
+                      className="rounded-lg border border-border/80 bg-background px-3 py-1.5 text-xs font-semibold text-foreground hover:bg-accent cursor-pointer"
+                    >
+                      Set Wallpaper
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        handleApplyAndView(
+                          genCity.trim() || currentCity,
+                          lastGeneratedUrl,
+                          `${genCity.trim() || currentCity} — ${genPrompt}`
+                        )
+                      }
+                      className="rounded-lg bg-primary px-3.5 py-1.5 text-xs font-bold text-primary-foreground shadow-xs hover:bg-primary/90 cursor-pointer"
+                    >
+                      🌤️ Apply & View Weather
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ======================================================== */}
+      {/* TAB 4: MY SAVED & UPLOADED ART (IndexedDB)               */}
+      {/* ======================================================== */}
+      {activeTab === "saved" && (
+        <div className="mt-6 space-y-6">
+          <input
+            type="file"
+            ref={fileInputRef}
+            onChange={handleFileChange}
+            accept="image/*"
+            className="hidden"
+          />
+
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h2 className="text-lg font-bold tracking-tight">📁 On-Device Art Collection</h2>
+              <p className="text-xs text-muted-foreground">
+                All generated watercolors and uploaded photos are stored privately on this device.
+              </p>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                className="inline-flex items-center gap-1.5 rounded-xl bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground shadow-xs hover:bg-primary/90 cursor-pointer"
+              >
+                <span>📷</span>
+                <span>Upload Photo</span>
+              </button>
+
+              {savedArts.length > 0 && (
+                <button
+                  type="button"
+                  onClick={handleClearAllSaved}
+                  className="rounded-xl border border-destructive/40 px-3 py-1.5 text-xs font-medium text-destructive hover:bg-destructive/10 cursor-pointer"
+                >
+                  Clear All
+                </button>
+              )}
+            </div>
+          </div>
+
+          {savedArts.length === 0 ? (
+            <div className="rounded-2xl border border-dashed border-border/70 p-12 text-center">
+              <span className="text-3xl">🖼️</span>
+              <p className="mt-2 text-sm font-semibold">No saved art yet</p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Generate an AI watercolor or upload a photo to start your collection.
+              </p>
+              <div className="mt-4 flex justify-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setActiveTab("generator")}
+                  className="rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground hover:bg-primary/90 cursor-pointer"
+                >
+                  Generate AI Art
+                </button>
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="rounded-lg border border-border px-3 py-1.5 text-xs font-medium hover:bg-accent cursor-pointer"
+                >
+                  Upload Photo
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
+              {savedArts.map((item) => (
+                <div
+                  key={item.id}
+                  className="group relative flex flex-col overflow-hidden rounded-xl border border-border/70 bg-card transition-all hover:shadow-xs"
+                >
+                  <div className="relative aspect-4/3 w-full overflow-hidden bg-muted">
+                    <img
+                      src={item.url}
+                      alt={item.label}
+                      className="h-full w-full object-cover"
+                    />
+
+                    {/* Mobile-friendly always visible preview button, hover on desktop */}
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setPreviewImage({
+                          url: item.url,
+                          title: item.label,
+                          city: item.city || currentCity,
+                        })
+                      }
+                      className="absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-full bg-black/60 text-white opacity-85 sm:opacity-0 sm:group-hover:opacity-100 backdrop-blur-xs transition-opacity cursor-pointer"
+                      title="Expand preview"
+                    >
+                      🔍
+                    </button>
+                  </div>
+
+                  <div className="flex flex-1 flex-col justify-between p-2.5 text-xs">
+                    <div>
+                      <p className="line-clamp-1 font-semibold">{item.label}</p>
+                      <p className="text-[10px] text-muted-foreground">{item.date}</p>
+                    </div>
+
+                    <div className="mt-2 flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          handleSelectArt(
+                            (item.city || currentCity).toLowerCase(),
+                            item.url,
+                            item.label
+                          )
+                        }
+                        className="flex-1 rounded-md bg-primary/10 py-1 text-center font-medium text-primary hover:bg-primary hover:text-primary-foreground cursor-pointer"
+                      >
+                        Set Wallpaper
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={(e) => handleDeleteSaved(item.id, e)}
+                        className="rounded-md border border-destructive/40 p-1 text-destructive hover:bg-destructive/10 cursor-pointer"
+                        title="Delete"
+                      >
+                        🗑️
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Fullscreen Zoom Preview Modal */}
+      {previewImage && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm animate-in fade-in"
+          onClick={() => setPreviewImage(null)}
+        >
+          <div
+            className="relative max-h-[90vh] max-w-3xl overflow-hidden rounded-2xl bg-card shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <img
+              src={previewImage.url}
+              alt={previewImage.title}
+              className="max-h-[75vh] w-full object-contain"
+            />
+            <div className="flex items-center justify-between border-t border-border/50 p-4">
+              <div>
+                <p className="text-sm font-bold">{previewImage.title}</p>
+                <p className="text-xs text-muted-foreground">{previewImage.city}</p>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    handleSelectArt(
+                      previewImage.city.toLowerCase(),
+                      previewImage.url,
+                      previewImage.title
+                    );
+                    setPreviewImage(null);
+                  }}
+                  className="rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground hover:bg-primary/90 cursor-pointer"
+                >
+                  Set as Background
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setPreviewImage(null)}
+                  className="rounded-lg border border-border px-3 py-1.5 text-xs font-medium hover:bg-muted cursor-pointer"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </main>
+  );
+}
+
+export default ArtGalleryPage;
