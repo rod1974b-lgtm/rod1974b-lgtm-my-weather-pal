@@ -38,6 +38,7 @@ export interface RootBeerTier {
     staticMascots: number;
     animatedMascots: number;
     noAdsDays: number;
+    noAdsForever?: boolean;
     label: string;
   };
   files: {
@@ -53,7 +54,7 @@ export const ROOT_BEER_TIERS_DEEPER_AMBER_NO_PRICE: RootBeerTier[] = [
     id: "small_root_beer_tier",
     name: "Small Root Beer Tier",
     level: 1,
-    price: 1.00,
+    price: 1.0,
     displayPrice: "$1",
     thankYouText: "Small Root Beer Tier - Thank You!",
     thankYouBackground: "small_amber_thankyou_bg",
@@ -78,7 +79,7 @@ export const ROOT_BEER_TIERS_DEEPER_AMBER_NO_PRICE: RootBeerTier[] = [
     id: "medium_root_beer_tier",
     name: "Medium Root Beer Tier",
     level: 2,
-    price: 3.00,
+    price: 3.0,
     displayPrice: "$3",
     thankYouText: "Medium Root Beer Tier - Thank You!",
     thankYouBackground: "medium_amber_thankyou_bg",
@@ -90,8 +91,8 @@ export const ROOT_BEER_TIERS_DEEPER_AMBER_NO_PRICE: RootBeerTier[] = [
       aiBackgrounds: 2,
       staticMascots: 2,
       animatedMascots: 1,
-      noAdsDays: 7,
-      label: "2 BGs + 2 AI + 2 static + 1 animated FOREVER + 7 days no ads + Medium thank-you forever",
+      noAdsDays: 30,
+      label: "2 BGs + 2 AI + 2 static + 1 animated FOREVER + 30 days no ads",
     },
     files: {
       staticTransparent: "/tier%20plans/static_transparent_deeper_amber/medium_amber_transparent.png",
@@ -103,7 +104,7 @@ export const ROOT_BEER_TIERS_DEEPER_AMBER_NO_PRICE: RootBeerTier[] = [
     id: "large_root_beer_tier",
     name: "Large Root Beer Tier",
     level: 3,
-    price: 5.00,
+    price: 5.0,
     displayPrice: "$5",
     thankYouText: "Large Root Beer Tier - Thank You!",
     thankYouBackground: "large_amber_thankyou_bg",
@@ -115,8 +116,8 @@ export const ROOT_BEER_TIERS_DEEPER_AMBER_NO_PRICE: RootBeerTier[] = [
       aiBackgrounds: 3,
       staticMascots: 4,
       animatedMascots: 2,
-      noAdsDays: 30,
-      label: "3 BGs + 3 AI + 4 static + 2 animated FOREVER + 30 days no ads + Large thank-you + video",
+      noAdsDays: 365,
+      label: "3 BGs + 3 AI + 4 static + 2 animated FOREVER + 1 year no ads + Video",
     },
     files: {
       staticTransparent: "/tier%20plans/static_transparent_deeper_amber/large_amber_transparent.png",
@@ -129,7 +130,7 @@ export const ROOT_BEER_TIERS_DEEPER_AMBER_NO_PRICE: RootBeerTier[] = [
     id: "party_pack_root_beer_tier",
     name: "Party Pack Root Beer Tier",
     level: 4,
-    price: 10.00,
+    price: 10.0,
     displayPrice: "$10",
     thankYouText: "Party Pack Root Beer Tier - Thank You!",
     thankYouBackground: "party_amber_thankyou_bg",
@@ -141,8 +142,9 @@ export const ROOT_BEER_TIERS_DEEPER_AMBER_NO_PRICE: RootBeerTier[] = [
       aiBackgrounds: 10,
       staticMascots: 8,
       animatedMascots: 4,
-      noAdsDays: 365,
-      label: "ALL 6 BGs + 10 AI + 8 static + 4 animated FOREVER + 365 days no ads + Party thank-you + video",
+      noAdsDays: 36500,
+      noAdsForever: true,
+      label: "ALL 6 BGs + 10 AI + 8 static + 4 animated + NO ADS FOREVER + Video",
     },
     files: {
       staticTransparent: "/tier%20plans/static_transparent_deeper_amber/party_amber_transparent.png",
@@ -197,8 +199,18 @@ export const saveThankYouBackgroundForever = (tierId: string) => {
   });
 
   localStorage.setItem(`bonus_ai_bgs_${tierId}`, tier.bonus.aiBackgrounds.toString());
-  const noAdsUntil = Date.now() + tier.bonus.noAdsDays * 24 * 60 * 60 * 1000;
-  localStorage.setItem(`no_ads_until`, noAdsUntil.toString());
+
+  // Ad-Free Duration
+  if (tier.bonus.noAdsForever) {
+    localStorage.setItem("no_ads_forever", "true");
+    localStorage.setItem(
+      "no_ads_until",
+      (Date.now() + 100 * 365 * 24 * 60 * 60 * 1000).toString()
+    );
+  } else if (tier.bonus.noAdsDays > 0) {
+    const noAdsUntil = Date.now() + tier.bonus.noAdsDays * 24 * 60 * 60 * 1000;
+    localStorage.setItem("no_ads_until", noAdsUntil.toString());
+  }
 
   try {
     const purchases = JSON.parse(localStorage.getItem("rootbeer_purchases") || "[]");
@@ -229,6 +241,9 @@ export const unlockWithAd24h = (bgId: string) => {
 
 export const isAdUnlocked = (bgId: string): boolean => {
   if (typeof window === "undefined") return false;
+  if (localStorage.getItem("no_ads_forever") === "true") return true;
+  const noAdsUntil = localStorage.getItem("no_ads_until");
+  if (noAdsUntil && Date.now() < parseInt(noAdsUntil, 10)) return true;
   const until = localStorage.getItem(`ad_unlocked_${bgId}`);
   if (!until) return false;
   return Date.now() < parseInt(until, 10);
@@ -271,6 +286,12 @@ export const clearPendingDonationTier = () => {
 export const DONATION_CONFIG = {
   paypalUsername: "rod1974b",
   buyMeACoffeePage: "https://buymeacoffee.com/rod1974b",
+  buyMeACoffeeExtras: {
+    small_root_beer_tier: "https://buymeacoffee.com/rod1974b/e/595466",
+    medium_root_beer_tier: "https://buymeacoffee.com/rod1974b/e/595468",
+    large_root_beer_tier: "https://buymeacoffee.com/rod1974b/e/595470",
+    party_pack_root_beer_tier: "https://buymeacoffee.com/rod1974b/e/595471",
+  } as Record<string, string>,
   kofiPage: "",
   stripeLinks: {
     small_root_beer_tier: "",
@@ -294,6 +315,8 @@ export const getDonationUrl = (
 
   switch (provider) {
     case "buymeacoffee": {
+      const extraUrl = DONATION_CONFIG.buyMeACoffeeExtras[tierId];
+      if (extraUrl) return extraUrl;
       const base = DONATION_CONFIG.buyMeACoffeePage || "https://buymeacoffee.com/rod1974b";
       return tier?.price ? `${base}?amount=${tier.price}` : base;
     }
