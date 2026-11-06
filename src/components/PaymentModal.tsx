@@ -6,6 +6,7 @@ import {
   isMedianAndroidApp,
   purchaseTierViaGooglePlay,
   saveThankYouBackgroundForever,
+  setPendingDonationTier,
   type RootBeerTier,
   type DonationProvider,
 } from "@/lib/monetization";
@@ -32,13 +33,14 @@ export function PaymentModal({ tierId, onClose, onSuccess }: PaymentModalProps) 
 
   const handleOpenWebPayment = (provider: DonationProvider, label: string) => {
     try {
+      setPendingDonationTier(tier.id);
       const url = getDonationUrl(tier.id, provider);
       window.open(url, "_blank", "noopener,noreferrer");
       setSelectedProvider(label);
       setHasOpenedCheckout(true);
       setErrorMessage(null);
-    } catch (err: any) {
-      setErrorMessage("Could not open payment link. Please try another method.");
+    } catch {
+      setErrorMessage("Could not open payment link. Please try again.");
     }
   };
 
@@ -50,26 +52,20 @@ export function PaymentModal({ tierId, onClose, onSuccess }: PaymentModalProps) 
       tier.id,
       () => {
         setPlayBillingLoading(false);
-        handleClaimRewards();
+        saveThankYouBackgroundForever(tier.id);
+        window.dispatchEvent(
+          new CustomEvent("weather:trigger-tier-thankyou", { detail: { tierId: tier.id } })
+        );
+        if (onSuccess) onSuccess(tier.id);
+        onClose();
       },
       (err: any) => {
         setPlayBillingLoading(false);
         setErrorMessage(
-          err?.message || "Google Play billing was cancelled or unavailable. You can use Credit/Debit card above."
+          err?.message || "Google Play billing was cancelled or unavailable."
         );
       }
     );
-  };
-
-  const handleClaimRewards = () => {
-    saveThankYouBackgroundForever(tier.id);
-    window.dispatchEvent(
-      new CustomEvent("weather:trigger-tier-thankyou", { detail: { tierId: tier.id } })
-    );
-    if (onSuccess) {
-      onSuccess(tier.id);
-    }
-    onClose();
   };
 
   return (
@@ -133,11 +129,11 @@ export function PaymentModal({ tierId, onClose, onSuccess }: PaymentModalProps) 
               Select how you'd like to support:
             </p>
 
-            {/* 1. Debit or Credit Card (Stripe) */}
+            {/* 1. Debit or Credit Card / Apple Pay (Buy Me a Coffee) */}
             <button
               type="button"
-              onClick={() => handleOpenWebPayment("stripe", "Debit / Credit Card")}
-              className="w-full text-left p-3 rounded-xl bg-gradient-to-r from-amber-500/10 to-amber-700/10 hover:from-amber-500/20 hover:to-amber-700/20 border border-amber-500/40 hover:border-amber-500/60 transition shadow-xs cursor-pointer flex items-center justify-between gap-3 group"
+              onClick={() => handleOpenWebPayment("buymeacoffee", "Debit or Credit Card")}
+              className="w-full text-left p-3 rounded-xl bg-gradient-to-r from-amber-500/15 to-amber-700/15 hover:from-amber-500/25 hover:to-amber-700/25 border border-amber-500/50 hover:border-amber-500/70 transition shadow-xs cursor-pointer flex items-center justify-between gap-3 group"
             >
               <div className="flex items-center gap-3">
                 <span className="text-2xl">💳</span>
@@ -158,29 +154,7 @@ export function PaymentModal({ tierId, onClose, onSuccess }: PaymentModalProps) 
               </span>
             </button>
 
-            {/* 2. Buy Me a Coffee */}
-            <button
-              type="button"
-              onClick={() => handleOpenWebPayment("buymeacoffee", "Buy Me a Coffee")}
-              className="w-full text-left p-3 rounded-xl bg-card/80 hover:bg-muted/60 border border-border/80 hover:border-amber-500/40 transition shadow-xs cursor-pointer flex items-center justify-between gap-3 group"
-            >
-              <div className="flex items-center gap-3">
-                <span className="text-2xl">☕</span>
-                <div>
-                  <div className="text-xs font-bold text-foreground">
-                    Buy Me a Coffee
-                  </div>
-                  <div className="text-[10px] text-muted-foreground mt-0.5">
-                    Supports Cards, Apple Pay & direct checkout
-                  </div>
-                </div>
-              </div>
-              <span className="text-xs text-muted-foreground group-hover:text-foreground group-hover:translate-x-0.5 transition-transform">
-                →
-              </span>
-            </button>
-
-            {/* 3. PayPal */}
+            {/* 2. PayPal Option */}
             <button
               type="button"
               onClick={() => handleOpenWebPayment("paypal", "PayPal")}
@@ -190,10 +164,10 @@ export function PaymentModal({ tierId, onClose, onSuccess }: PaymentModalProps) 
                 <span className="text-2xl">🅿️</span>
                 <div>
                   <div className="text-xs font-bold text-foreground">
-                    PayPal / Guest Card
+                    PayPal
                   </div>
                   <div className="text-[10px] text-muted-foreground mt-0.5">
-                    PayPal account or Card guest checkout
+                    Pay with PayPal account
                   </div>
                 </div>
               </div>
@@ -202,7 +176,7 @@ export function PaymentModal({ tierId, onClose, onSuccess }: PaymentModalProps) 
               </span>
             </button>
 
-            {/* 4. Google Play (If on Android APK) */}
+            {/* 3. Google Play (If on Android APK) */}
             {isAndroidMedian && (
               <button
                 type="button"
@@ -234,42 +208,52 @@ export function PaymentModal({ tierId, onClose, onSuccess }: PaymentModalProps) 
 
             <div className="pt-2 text-center">
               <p className="text-[10px] text-muted-foreground">
-                🔒 Secure, SSL-encrypted checkout. Unlocks perks permanently on this device.
+                🔒 Secure, SSL-encrypted checkout powered by Buy Me a Coffee.
               </p>
             </div>
           </div>
         ) : (
-          /* Step 2: User opened checkout in new tab */
-          <div className="text-center py-2 space-y-3.5">
+          /* Step 2: Auto-Redirect Notice (No Fakeable Button) */
+          <div className="py-2 space-y-3.5 text-center">
             <div className="w-12 h-12 mx-auto rounded-full bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-2xl animate-pulse">
-              💳
+              ☕
             </div>
 
             <div>
               <h4 className="text-sm font-bold text-foreground">
-                Completing Checkout via {selectedProvider}
+                Checkout Opened on {selectedProvider}
               </h4>
-              <p className="text-xs text-muted-foreground mt-1 max-w-xs mx-auto">
-                Your payment page opened in a new tab. Once you complete the donation, tap the button below to claim your permanent bonuses!
+              <p className="text-xs text-muted-foreground mt-1.5 max-w-xs mx-auto leading-relaxed">
+                Complete your donation in the Buy Me a Coffee tab that just opened.
               </p>
             </div>
 
-            <button
-              type="button"
-              onClick={handleClaimRewards}
-              className="w-full py-3 rounded-xl bg-gradient-to-r from-amber-600 via-amber-500 to-amber-700 hover:from-amber-500 hover:to-amber-600 text-white font-bold text-xs shadow-lg shadow-amber-600/25 transition cursor-pointer flex items-center justify-center gap-2"
-            >
-              <span>🎉</span>
-              <span>I've Completed My Donation (Unlock Perks)</span>
-            </button>
+            <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-700 dark:text-amber-300 text-xs text-left space-y-1">
+              <div className="font-bold flex items-center gap-1.5">
+                <span>⚡</span>
+                <span>Automatic Verification</span>
+              </div>
+              <p className="text-[11px] text-muted-foreground">
+                As soon as your card payment is confirmed, Buy Me a Coffee will automatically return you here and your bonus perks will unlock instantly!
+              </p>
+            </div>
 
-            <button
-              type="button"
-              onClick={() => setHasOpenedCheckout(false)}
-              className="text-xs text-muted-foreground hover:text-foreground underline transition cursor-pointer"
-            >
-              Need to pick a different payment method?
-            </button>
+            <div className="pt-2 space-y-2 border-t border-border/50">
+              <button
+                type="button"
+                onClick={() => handleOpenWebPayment("buymeacoffee", "Buy Me a Coffee")}
+                className="w-full py-2.5 rounded-xl bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-600 text-white font-bold text-xs shadow-md shadow-amber-600/20 transition cursor-pointer"
+              >
+                Re-open Buy Me a Coffee Page
+              </button>
+              <button
+                type="button"
+                onClick={() => setHasOpenedCheckout(false)}
+                className="text-xs text-muted-foreground hover:text-foreground underline transition cursor-pointer block mx-auto"
+              >
+                Choose another payment option
+              </button>
+            </div>
           </div>
         )}
       </div>
