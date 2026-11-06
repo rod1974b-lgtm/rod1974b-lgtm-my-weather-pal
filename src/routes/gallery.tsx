@@ -299,12 +299,17 @@ function ArtGalleryPage() {
 
   const filteredCities = useMemo(() => {
     return allCities.filter((city) => {
+      const cityTitles = LANDMARK_TITLES[city];
+      const titleMatches = Array.isArray(cityTitles)
+        ? cityTitles.some((title) =>
+            title.toLowerCase().includes(searchQuery.toLowerCase().trim())
+          )
+        : typeof cityTitles === "string" &&
+          cityTitles.toLowerCase().includes(searchQuery.toLowerCase().trim());
       const matchesSearch =
         searchQuery.trim() === "" ||
         city.toLowerCase().includes(searchQuery.toLowerCase().trim()) ||
-        (LANDMARK_TITLES[city] || []).some((title) =>
-          title.toLowerCase().includes(searchQuery.toLowerCase().trim())
-        );
+        titleMatches;
 
       if (!matchesSearch) return false;
 
@@ -439,7 +444,12 @@ function ArtGalleryPage() {
 
     try {
       const fullPrompt = `Watercolor painting of ${aiCity || currentCity}: ${aiPrompt.trim()}, ${aiSeason} lighting, ${aiStyle} style, clean soft watercolor washes, beautiful atmospheric sky landscape`;
-      const result = await generateWatercolorFn({ data: { prompt: fullPrompt } });
+      const result = await generateWatercolorFn({
+        data: {
+          city: aiCity || currentCity,
+          userPrompt: `${fullPrompt} (${aiSeason} lighting, ${aiStyle} style)`,
+        },
+      });
 
       if (result && result.imageUrl) {
         const compressed = await compressImage(result.imageUrl, 1400, 0.82);
