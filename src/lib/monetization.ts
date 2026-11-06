@@ -1,3 +1,53 @@
+// src/lib/monetization.ts
+
+// FREE: 3 backgrounds + 2 AI forever free (no ads, no purchase)
+export const FREE_BACKGROUNDS = ["clear_day", "clear_night", "cloudy_day"] as const;
+export const FREE_AI_SLOTS = 2;
+export const FREE_AI_GENERATIONS = 2;
+
+// ADS: 2 backgrounds + 3 AI for 24h via rewarded ad
+export const ADS_BACKGROUNDS = ["rainy", "snowy"] as const;
+export const ADS_AI_SLOTS = 3;
+export const ADS_AI_GENERATIONS = 3;
+export const ADS_DURATION_HOURS = 24;
+export const ADMOB_REWARDED_ID = "ca-app-pub-XXXXXXXXXXXXXXXX/YYYYYYYYYY";
+
+// PREMIUM: Only with Root Beer / Lifetime
+export const PREMIUM_BACKGROUNDS = ["haze", "storm"] as const;
+export const ALL_BACKGROUNDS = [
+  ...FREE_BACKGROUNDS,
+  ...ADS_BACKGROUNDS,
+  ...PREMIUM_BACKGROUNDS,
+] as const;
+
+// ROOT BEER TIERS — Deeper amber watercolor ribbon unified
+export interface RootBeerTier {
+  id: string;
+  name: string;
+  level: number;
+  price: number;
+  displayPrice: string;
+  thankYouText: string;
+  thankYouBackground: string;
+  ribbonColor: string;
+  bubbles: number;
+  sounds: string;
+  bonus: {
+    backgrounds: string[];
+    aiBackgrounds: number;
+    staticMascots: number;
+    animatedMascots: number;
+    noAdsDays: number;
+    label: string;
+  };
+  files: {
+    staticTransparent: string;
+    staticFull?: string;
+    video?: string;
+    lottie?: string;
+  };
+}
+
 export const ROOT_BEER_TIERS_DEEPER_AMBER_NO_PRICE: RootBeerTier[] = [
   {
     id: "small_root_beer_tier",
@@ -102,3 +152,222 @@ export const ROOT_BEER_TIERS_DEEPER_AMBER_NO_PRICE: RootBeerTier[] = [
     },
   },
 ];
+
+export const SORTED_TIERS = [...ROOT_BEER_TIERS_DEEPER_AMBER_NO_PRICE].sort(
+  (a, b) => a.level - b.level
+);
+export const PLAY_BILLING_PRODUCT_IDS = ROOT_BEER_TIERS_DEEPER_AMBER_NO_PRICE.map(
+  (t) => t.id
+);
+export const LIFETIME_PRODUCT_ID = "ai_gallery_lifetime_unlock";
+export const LIFETIME_PRICE = "$1.99";
+export const LIFETIME_AI_PER_DAY = 10;
+
+export type BackgroundAccess = "free" | "ads_24h" | "premium" | "thankyou_forever";
+
+export const getBackgroundAccess = (
+  bgId: string,
+  unlockedThankYouBgs: string[],
+  adUnlocked: string[]
+): BackgroundAccess => {
+  if ((FREE_BACKGROUNDS as readonly string[]).includes(bgId)) return "free";
+  if (unlockedThankYouBgs.includes(bgId)) return "thankyou_forever";
+  if ((ADS_BACKGROUNDS as readonly string[]).includes(bgId)) {
+    return adUnlocked.includes(bgId) ? "free" : "ads_24h";
+  }
+  return "premium";
+};
+
+export const getThankYouBackground = (tierId: string) => {
+  const tier = ROOT_BEER_TIERS_DEEPER_AMBER_NO_PRICE.find((t) => t.id === tierId);
+  return tier?.thankYouBackground || "default_thankyou_bg";
+};
+
+export const saveThankYouBackgroundForever = (tierId: string) => {
+  if (typeof window === "undefined") return null;
+  const tier = ROOT_BEER_TIERS_DEEPER_AMBER_NO_PRICE.find((t) => t.id === tierId);
+  if (!tier) return null;
+
+  localStorage.setItem(`thankyou_bg_${tierId}`, tier.thankYouBackground);
+  localStorage.setItem(`thankyou_unlocked_${tierId}`, "true");
+
+  tier.bonus.backgrounds.forEach((bg) => {
+    localStorage.setItem(`unlocked_bg_${bg}`, "true");
+    localStorage.setItem(`unlocked_bg_${bg}_forever`, "true");
+  });
+
+  localStorage.setItem(`bonus_ai_bgs_${tierId}`, tier.bonus.aiBackgrounds.toString());
+  const noAdsUntil = Date.now() + tier.bonus.noAdsDays * 24 * 60 * 60 * 1000;
+  localStorage.setItem(`no_ads_until`, noAdsUntil.toString());
+
+  try {
+    const purchases = JSON.parse(localStorage.getItem("rootbeer_purchases") || "[]");
+    purchases.push({ tierId, date: Date.now(), bonus: tier.bonus });
+    localStorage.setItem("rootbeer_purchases", JSON.stringify(purchases));
+  } catch {}
+
+  return tier;
+};
+
+export const isThankYouBackgroundUnlocked = (tierId: string) => {
+  if (typeof window === "undefined") return false;
+  return localStorage.getItem(`thankyou_unlocked_${tierId}`) === "true";
+};
+
+export const getAllUnlockedThankYouBackgrounds = (): string[] => {
+  if (typeof window === "undefined") return [];
+  return ROOT_BEER_TIERS_DEEPER_AMBER_NO_PRICE.filter((t) =>
+    isThankYouBackgroundUnlocked(t.id)
+  ).map((t) => t.thankYouBackground);
+};
+
+export const unlockWithAd24h = (bgId: string) => {
+  if (typeof window === "undefined") return;
+  const until = Date.now() + ADS_DURATION_HOURS * 60 * 60 * 1000;
+  localStorage.setItem(`ad_unlocked_${bgId}`, until.toString());
+};
+
+export const isAdUnlocked = (bgId: string): boolean => {
+  if (typeof window === "undefined") return false;
+  const until = localStorage.getItem(`ad_unlocked_${bgId}`);
+  if (!until) return false;
+  return Date.now() < parseInt(until, 10);
+};
+
+export const getAdUnlockedBackgrounds = (): string[] => {
+  return ADS_BACKGROUNDS.filter((bg) => isAdUnlocked(bg));
+};
+
+// ============================================================================
+// DONATION CONFIGURATION & AUTO-REDIRECT TRACKING
+// ============================================================================
+export type DonationProvider = "stripe" | "buymeacoffee" | "kofi" | "paypal";
+
+export const PENDING_TIER_KEY = "weather:pending-donation-tier";
+
+export const setPendingDonationTier = (tierId: string) => {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.setItem(PENDING_TIER_KEY, tierId);
+  } catch {}
+};
+
+export const getPendingDonationTier = (): string | null => {
+  if (typeof window === "undefined") return null;
+  try {
+    return localStorage.getItem(PENDING_TIER_KEY);
+  } catch {
+    return null;
+  }
+};
+
+export const clearPendingDonationTier = () => {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.removeItem(PENDING_TIER_KEY);
+  } catch {}
+};
+
+export const DONATION_CONFIG = {
+  paypalUsername: "rod1974b",
+  buyMeACoffeePage: "https://buymeacoffee.com/rod1974b",
+  kofiPage: "",
+  stripeLinks: {
+    small_root_beer_tier: "",
+    medium_root_beer_tier: "",
+    large_root_beer_tier: "",
+    party_pack_root_beer_tier: "",
+    ai_gallery_lifetime_unlock: "",
+  } as Record<string, string>,
+};
+
+const findTier = (tierId: string) =>
+  ROOT_BEER_TIERS_DEEPER_AMBER_NO_PRICE.find((t) => t.id === tierId);
+
+export const getDonationUrl = (
+  tierId: string,
+  provider: DonationProvider
+): string => {
+  const tier = findTier(tierId);
+  const amount = tier?.price ? tier.price.toFixed(2) : "1.00";
+  const note = encodeURIComponent(tier?.name || "My Weather Pal support");
+
+  switch (provider) {
+    case "buymeacoffee": {
+      const base = DONATION_CONFIG.buyMeACoffeePage || "https://buymeacoffee.com/rod1974b";
+      return tier?.price ? `${base}?amount=${tier.price}` : base;
+    }
+    case "stripe": {
+      const link = DONATION_CONFIG.stripeLinks[tierId];
+      if (link) return link;
+      return `https://buy.stripe.com/${tierId}`;
+    }
+    case "kofi": {
+      return DONATION_CONFIG.kofiPage || "https://ko-fi.com/";
+    }
+    case "paypal":
+    default: {
+      return `https://paypal.me/${DONATION_CONFIG.paypalUsername}/${amount}USD?locale.x=en_US&note=${note}`;
+    }
+  }
+};
+
+// Detects the Median.co Android WebView wrapper.
+export const isMedianAndroidApp = (): boolean => {
+  if (typeof window === "undefined") return false;
+  const w = window as unknown as {
+    median?: unknown;
+    MedIAN?: unknown;
+  };
+  return (
+    typeof w.median !== "undefined" ||
+    typeof w.MedIAN !== "undefined" ||
+    /median/i.test(navigator.userAgent || "")
+  );
+};
+
+// Google Play In-App Purchase through the Median bridge.
+export const purchaseTierViaGooglePlay = (
+  tierId: string,
+  onSuccess: () => void,
+  onError: (err: { message?: string } | null) => void
+): void => {
+  if (typeof window === "undefined") {
+    onError({ message: "Purchase unavailable in this environment." });
+    return;
+  }
+  const bridge = (window as unknown as {
+    median?: {
+      iap?: {
+        purchase?: (opts: {
+          productID?: string;
+          productId?: string;
+          callback?: (result: { event?: string; errorMessage?: string }) => void;
+        }) => void;
+      };
+    };
+  }).median;
+
+  if (!bridge?.iap?.purchase) {
+    onError({
+      message: "Google Play billing is not available. Use a payment method above.",
+    });
+    return;
+  }
+
+  try {
+    bridge.iap.purchase({
+      productID: tierId,
+      callback: (result) => {
+        const event = (result?.event || "").toLowerCase();
+        if (!event || event.includes("success")) {
+          onSuccess();
+        } else {
+          onError({ message: result?.errorMessage || "Purchase was cancelled." });
+        }
+      },
+    });
+  } catch (err: any) {
+    onError({ message: err?.message || "Purchase was cancelled." });
+  }
+};
