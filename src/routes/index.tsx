@@ -220,7 +220,25 @@ function Index() {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const [unit, setUnit] = useState<WeatherUnit>("metric");
-  const [place, setPlace] = useState<Place>(DEFAULT_PLACE);
+
+  // Lazy initialize place so Bangkok never flashes or fetches first
+  const [place, setPlace] = useState<Place>(() => {
+    if (typeof window === "undefined") return DEFAULT_PLACE;
+    try {
+      const galleryPlaceRaw = localStorage.getItem("weather:gallery-selected-place");
+      if (galleryPlaceRaw) {
+        localStorage.removeItem("weather:gallery-selected-place");
+        const parsed = JSON.parse(galleryPlaceRaw);
+        if (parsed?.name && typeof parsed.lat === "number" && typeof parsed.lon === "number") {
+          return parsed as Place;
+        }
+      }
+      const saved = loadLastPlace();
+      if (saved) return saved;
+    } catch {}
+    return DEFAULT_PLACE;
+  });
+
   const [weather, setWeather] = useState<Weather | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
@@ -257,10 +275,12 @@ function Index() {
     return adBgs;
   });
 
-  const handleAdUnlock = (bgId: string) => {
-    unlockWithAd24h(bgId);
-    setAdUnlockedBgs((prev) => [...prev, bgId]);
-  };
+  // Always keep localStorage synchronized with current place
+  useEffect(() => {
+    if (place) {
+      saveLastPlace(place);
+    }
+  }, [place]);
 
   // 1. Initial Preferences, Auto-Redirect Return & Listeners
   useEffect(() => {
@@ -287,7 +307,6 @@ function Index() {
           setPurchasedTierId(tier);
           localStorage.removeItem("weather:pending-donation-tier");
 
-          // Clean up the URL query parameter so the address bar stays clean
           const cleanUrl = window.location.pathname;
           window.history.replaceState({}, document.title, cleanUrl);
         }
@@ -347,29 +366,6 @@ function Index() {
       setLoading(false);
     }
   };
-
-  // Check if user came back from Art Gallery with a selected city, or restore last visited city
-  useEffect(() => {
-    try {
-      const galleryCity = localStorage.getItem("weather:last-searched-city");
-      if (galleryCity) {
-        localStorage.removeItem("weather:last-searched-city");
-        searchCity(galleryCity).then((results) => {
-          const firstResult = results[0];
-          if (firstResult) {
-            handleSelectPlace(firstResult);
-          }
-        });
-        return;
-      }
-
-      // Restore last visited city if saved
-      const savedPlace = loadLastPlace();
-      if (savedPlace && !isSamePlace(savedPlace, DEFAULT_PLACE)) {
-        setPlace(savedPlace);
-      }
-    } catch {}
-  }, []);
 
   // Trigger load on place or unit change
   useEffect(() => {
@@ -458,7 +454,6 @@ function Index() {
     setLoading(true);
     setError(null);
 
-    // Fallback: IP-based city detection if GPS is blocked or unavailable
     const fallbackToIp = async () => {
       try {
         const res = await fetch("https://get.geojs.io/v1/ip/geo.json", {
@@ -524,13 +519,12 @@ function Index() {
         });
       },
       () => {
-        // If GPS is disabled, denied, or timed out, seamlessly fall back to IP
         fallbackToIp();
       },
       {
-        enableHighAccuracy: false, // Fast Wi-Fi / cellular fix
+        enableHighAccuracy: false,
         timeout: 10000,
-        maximumAge: 300000, // Use cached position if available within 5 mins
+        maximumAge: 300000,
       }
     );
   };
@@ -551,7 +545,6 @@ function Index() {
     );
   };
 
-  // Derived Sky Theme
   const activeSky =
     skyPref === "auto"
       ? weather
