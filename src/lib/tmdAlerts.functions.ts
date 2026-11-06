@@ -3,7 +3,7 @@ import { createServerFn } from "@tanstack/react-start";
 
 export interface TmdAlertItem {
   id: string;
-  severity: "warning" | "advisory" | "watch";
+  severity: "warning" | "advisory";
   category: "storm" | "rain" | "wind" | "flood" | "cold" | "heat" | "general" | "earthquake";
   headline: string;
   source: string;
