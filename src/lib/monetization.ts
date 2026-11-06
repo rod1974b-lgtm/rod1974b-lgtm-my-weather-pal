@@ -200,7 +200,7 @@ export const saveThankYouBackgroundForever = (tierId: string) => {
 
   localStorage.setItem(`bonus_ai_bgs_${tierId}`, tier.bonus.aiBackgrounds.toString());
 
-  // Ad-Free Duration
+  // Handle ad-free expiration
   if (tier.bonus.noAdsForever) {
     localStorage.setItem("no_ads_forever", "true");
     localStorage.setItem(
@@ -315,8 +315,8 @@ export const getDonationUrl = (
 
   switch (provider) {
     case "buymeacoffee": {
-      const extraUrl = DONATION_CONFIG.buyMeACoffeeExtras[tierId];
-      if (extraUrl) return extraUrl;
+      const directExtraUrl = DONATION_CONFIG.buyMeACoffeeExtras[tierId];
+      if (directExtraUrl) return directExtraUrl;
       const base = DONATION_CONFIG.buyMeACoffeePage || "https://buymeacoffee.com/rod1974b";
       return tier?.price ? `${base}?amount=${tier.price}` : base;
     }
