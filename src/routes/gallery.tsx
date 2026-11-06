@@ -620,6 +620,7 @@ function ArtGalleryPage() {
           </div>
         </div>
       </header>
+      <main className="mx-auto max-w-6xl px-4 py-4">
         {/* ======================================================== */}
         {/* TAB 1: CITY LANDMARKS CATALOG (33+ Famous Cities)        */}
         {/* ======================================================== */}
@@ -1200,5 +1201,3 @@ function ArtGalleryPage() {
 }
 
 export default ArtGalleryPage;
-
-      <main className="mx-auto max-w-6xl px-4 py-4">
