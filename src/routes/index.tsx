@@ -24,6 +24,7 @@ import {
   isAdUnlocked,
   unlockWithAd24h,
   getAllUnlockedThankYouBackgrounds,
+  saveThankYouBackgroundForever,
 } from "@/lib/monetization";
 import { getTmdAlertsFn } from "@/lib/tmdAlerts.functions";
 
@@ -261,7 +262,7 @@ function Index() {
     setAdUnlockedBgs((prev) => [...prev, bgId]);
   };
 
-  // 1. Initial Preferences & Listeners
+  // 1. Initial Preferences, Auto-Redirect Return & Listeners
   useEffect(() => {
     setUnit(loadUnitPref());
     setFavorites(loadFavorites());
@@ -270,6 +271,28 @@ function Index() {
       const storedSky = localStorage.getItem("weather:sky-pref") || "auto";
       setSkyPref(storedSky);
     } catch {}
+
+    // Check for Buy Me a Coffee return redirect (?paid=rootbeer)
+    if (typeof window !== "undefined") {
+      try {
+        const urlParams = new URLSearchParams(window.location.search);
+        const paid = urlParams.get("paid");
+        if (paid === "rootbeer" || paid === "true") {
+          const tier =
+            urlParams.get("tier") ||
+            localStorage.getItem("weather:pending-donation-tier") ||
+            "small_root_beer_tier";
+
+          saveThankYouBackgroundForever(tier);
+          setPurchasedTierId(tier);
+          localStorage.removeItem("weather:pending-donation-tier");
+
+          // Clean up the URL query parameter so the address bar stays clean
+          const cleanUrl = window.location.pathname;
+          window.history.replaceState({}, document.title, cleanUrl);
+        }
+      } catch {}
+    }
 
     const handleSkyChange = (e: Event) => {
       const customEvent = e as CustomEvent<{ sky: string }>;
