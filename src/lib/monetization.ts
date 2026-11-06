@@ -239,21 +239,45 @@ export const getAdUnlockedBackgrounds = (): string[] => {
 };
 
 // ============================================================================
-// DONATION LINKS & MEDIAN GOOGLE PLAY BILLING BRIDGE
+// DONATION CONFIGURATION & AUTO-REDIRECT TRACKING
 // ============================================================================
 export type DonationProvider = "stripe" | "buymeacoffee" | "kofi" | "paypal";
 
-// Paste the real links here as each account is created.
+export const PENDING_TIER_KEY = "weather:pending-donation-tier";
+
+export const setPendingDonationTier = (tierId: string) => {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.setItem(PENDING_TIER_KEY, tierId);
+  } catch {}
+};
+
+export const getPendingDonationTier = (): string | null => {
+  if (typeof window === "undefined") return null;
+  try {
+    return localStorage.getItem(PENDING_TIER_KEY);
+  } catch {
+    return null;
+  }
+};
+
+export const clearPendingDonationTier = () => {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.removeItem(PENDING_TIER_KEY);
+  } catch {}
+};
+
 export const DONATION_CONFIG = {
   paypalUsername: "rod1974b",
-  buyMeACoffeePage: "", // e.g. https://buymeacoffee.com/myusername
-  kofiPage: "", // e.g. https://ko-fi.com/myusername
+  buyMeACoffeePage: "https://buymeacoffee.com/rod1974b",
+  kofiPage: "",
   stripeLinks: {
-    small_root_beer_tier: "", // Stripe Payment Link for $0.99
-    medium_root_beer_tier: "", // Stripe Payment Link for $2.99
-    large_root_beer_tier: "", // Stripe Payment Link for $4.99
-    party_pack_root_beer_tier: "", // Stripe Payment Link for $9.99
-    ai_gallery_lifetime_unlock: "", // Stripe Payment Link for $1.99
+    small_root_beer_tier: "",
+    medium_root_beer_tier: "",
+    large_root_beer_tier: "",
+    party_pack_root_beer_tier: "",
+    ai_gallery_lifetime_unlock: "",
   } as Record<string, string>,
 };
 
@@ -269,17 +293,13 @@ export const getDonationUrl = (
   const note = encodeURIComponent(tier?.name || "My Weather Pal support");
 
   switch (provider) {
+    case "buymeacoffee": {
+      return DONATION_CONFIG.buyMeACoffeePage || "https://buymeacoffee.com/rod1974b";
+    }
     case "stripe": {
       const link = DONATION_CONFIG.stripeLinks[tierId];
       if (link) return link;
-      // Generic Stripe fallback (replace with a real Payment Link).
       return `https://buy.stripe.com/${tierId}`;
-    }
-    case "buymeacoffee": {
-      if (DONATION_CONFIG.buyMeACoffeePage) {
-        return `${DONATION_CONFIG.buyMeACoffeePage}/?amount=${amount}`;
-      }
-      return `https://buymeacoffee.com/?amount=${amount}`;
     }
     case "kofi": {
       return DONATION_CONFIG.kofiPage || "https://ko-fi.com/";
@@ -306,8 +326,6 @@ export const isMedianAndroidApp = (): boolean => {
 };
 
 // Google Play In-App Purchase through the Median bridge.
-// onSuccess fires after the bridge reports a completed purchase;
-// onError fires when the bridge is missing, cancelled, or errors.
 export const purchaseTierViaGooglePlay = (
   tierId: string,
   onSuccess: () => void,
