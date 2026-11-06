@@ -16,7 +16,7 @@ export const LANDMARK_WATERCOLORS: Record<string, string[]> = {
   bangkok: [
     "/backgrounds/vibrant/bangkok_sunny.jpg",
     "https://images.unsplash.com/photo-1508009603885-50cf7c579365?auto=format&fit=crop&w=800&q=75", // Wat Arun & Chao Phraya
-    "https://images.unsplash.com/photo-1563492065599-3580f77520f2?auto=format&fit=crop&w=800&q=75", // Grand Palace golden stupa
+    "https://images.unsplash.com/photo-1583417319070-4a69db38a482?auto=format&fit=crop&w=800&q=75", // Grand Palace golden stupa
     "https://images.unsplash.com/photo-1582510003544-4d00b7f74220?auto=format&fit=crop&w=800&q=75", // Skyline & river
   ],
   "chiang mai": [
