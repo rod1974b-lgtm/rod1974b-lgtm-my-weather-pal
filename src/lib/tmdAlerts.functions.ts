@@ -6,6 +6,10 @@ export interface TmdAlertItem {
   severity: "warning" | "advisory";
   category: "storm" | "rain" | "wind" | "flood" | "cold" | "heat" | "general" | "earthquake";
   headline: string;
+  headlineTh?: string;
+  headlineEn?: string;
+  tag?: string;
+  tagKey?: string;
   source: string;
   timeAgo?: string;
 }
@@ -40,29 +44,34 @@ export const getTmdAlertsFn = createServerFn({ method: "GET" }).handler(
         const w = rawList[idx];
         if (!w) continue;
 
-        let title = "";
+        let titleEn = "";
         if (Array.isArray(w.TitleEnglish)) {
           const en = w.TitleEnglish.find(
             (s: any) => typeof s === "string" && /[a-zA-Z]/.test(s)
           );
-          title = en || w.TitleEnglish[0] || "";
+          titleEn = en || w.TitleEnglish[0] || "";
         } else if (typeof w.TitleEnglish === "string" && w.TitleEnglish.trim()) {
-          title = w.TitleEnglish.trim();
+          titleEn = w.TitleEnglish.trim();
         }
 
-        if (!title && typeof w.TitleThai === "string" && w.TitleThai.trim()) {
-          title = w.TitleThai.trim();
+        let titleTh = "";
+        if (typeof w.TitleThai === "string" && w.TitleThai.trim()) {
+          titleTh = w.TitleThai.trim();
+        } else if (Array.isArray(w.TitleThai)) {
+          titleTh = w.TitleThai[0] || "";
         }
 
-        if (!title) {
-          title = "Severe Weather & High Waves Advisory";
-        }
+        const fallback = titleEn || titleTh || "Severe Weather & High Waves Advisory";
 
         alerts.push({
           id: `tmd-${w.IssueNo || idx}-${now}`,
           severity: "warning",
           category: "storm",
-          headline: `TMD Advisory: ${title}`,
+          tag: "TMD Advisory",
+          tagKey: "alert_advisory",
+          headline: titleEn || titleTh || fallback,
+          headlineEn: titleEn ? `TMD Advisory: ${titleEn}` : fallback,
+          headlineTh: titleTh ? `ประกาศเตือนภัย: ${titleTh}` : fallback,
           source: "TMD",
           timeAgo: "Active",
         });
