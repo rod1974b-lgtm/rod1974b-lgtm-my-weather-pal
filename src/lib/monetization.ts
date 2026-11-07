@@ -20,6 +20,14 @@ export const ALL_BACKGROUNDS = [
   ...PREMIUM_BACKGROUNDS,
 ] as const;
 
+export interface RootBeerTierPerks {
+  backgrounds: string;
+  aiGenerations: string;
+  mascots: string;
+  adFree: string;
+  celebration: string;
+}
+
 // ROOT BEER TIERS — Deeper amber watercolor ribbon unified
 export interface RootBeerTier {
   id: string;
@@ -27,6 +35,8 @@ export interface RootBeerTier {
   level: number;
   price: number;
   displayPrice: string;
+  tagline?: string;
+  perks?: RootBeerTierPerks;
   thankYouText: string;
   thankYouBackground: string;
   ribbonColor: string;
@@ -56,6 +66,14 @@ export const ROOT_BEER_TIERS_DEEPER_AMBER_NO_PRICE: RootBeerTier[] = [
     level: 1,
     price: 1.0,
     displayPrice: "$1",
+    tagline: "A refreshing chilled mug to show support and unlock cozy rainy skies.",
+    perks: {
+      backgrounds: "Unlocks Rainy sky background forever (no ads needed).",
+      aiGenerations: "+1 extra AI generation permanently unlocked.",
+      mascots: "1 static mascot unlocked.",
+      adFree: "None (standard free ad experience).",
+      celebration: "Soft pop!, light bubble fizz, cozy chime & bouncing burger mascot.",
+    },
     thankYouText: "Small Root Beer Tier - Thank You!",
     thankYouBackground: "small_amber_thankyou_bg",
     ribbonColor: "deeper amber watercolor rich warm golden brown #8B4513",
@@ -81,6 +99,14 @@ export const ROOT_BEER_TIERS_DEEPER_AMBER_NO_PRICE: RootBeerTier[] = [
     level: 2,
     price: 3.0,
     displayPrice: "$3",
+    tagline: "A hearty cold float with a full month of clean, ad-free weather.",
+    perks: {
+      backgrounds: "Unlocks Rainy and Snowy sky backgrounds forever.",
+      aiGenerations: "+2 extra AI generations permanently unlocked.",
+      mascots: "2 static mascots + 1 animated mascot unlocked.",
+      adFree: "30 Days (1 Full Month) completely ad-free.",
+      celebration: "Creamy fizzing pfffft, gentle plop, warm chime & float wobble animation.",
+    },
     thankYouText: "Medium Root Beer Tier - Thank You!",
     thankYouBackground: "medium_amber_thankyou_bg",
     ribbonColor: "deeper amber watercolor rich warm golden brown #8B4513",
@@ -106,6 +132,14 @@ export const ROOT_BEER_TIERS_DEEPER_AMBER_NO_PRICE: RootBeerTier[] = [
     level: 3,
     price: 5.0,
     displayPrice: "$5",
+    tagline: "A tall foaming mug with a full year of uninterrupted forecast checks.",
+    perks: {
+      backgrounds: "Unlocks Rainy, Snowy, and Haze sky backgrounds forever.",
+      aiGenerations: "+3 extra AI generations permanently unlocked.",
+      mascots: "4 static mascots + 2 animated mascots unlocked.",
+      adFree: "1 Year (365 Days) completely ad-free.",
+      celebration: "Hearty glug, creamy foam rise, legendary chime, mascot bounce & video.",
+    },
     thankYouText: "Large Root Beer Tier - Thank You!",
     thankYouBackground: "large_amber_thankyou_bg",
     ribbonColor: "deeper amber watercolor rich warm golden brown #8B4513",
@@ -132,6 +166,14 @@ export const ROOT_BEER_TIERS_DEEPER_AMBER_NO_PRICE: RootBeerTier[] = [
     level: 4,
     price: 10.0,
     displayPrice: "$10",
+    tagline: "The ultimate VIP supporter pack — lifetime ad-free and the complete sky catalog unlocked forever.",
+    perks: {
+      backgrounds: "Unlocks ALL backgrounds forever (Rainy, Snowy, Haze, and Storm).",
+      aiGenerations: "+10 extra AI generations permanently unlocked.",
+      mascots: "8 static mascots + 4 animated mascots unlocked.",
+      adFree: "Ad-Free Forever (Lifetime) — never see an ad again.",
+      celebration: "Explosive confetti (12 bubbles), 3 clinking mugs, party cheers, fanfare & video.",
+    },
     thankYouText: "Party Pack Root Beer Tier - Thank You!",
     thankYouBackground: "party_amber_thankyou_bg",
     ribbonColor: "deeper amber watercolor rich warm golden brown #8B4513",
