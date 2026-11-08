@@ -2,7 +2,7 @@ export type WeatherUnit = "metric" | "imperial";
 
 export type Place = {
   name: string;
-  country?: string;
+  country?: string | undefined;
   latitude: number;
   longitude: number;
 };
@@ -20,8 +20,20 @@ export type Weather = {
     wind: number;
     isDay: boolean;
   };
-  hourly: { time: string; temperature: number; code: number; precipitation: number }[];
-  daily: { date: string; high: number; low: number; code: number; precipitation: number }[];
+  hourly: {
+    time: string;
+    temperature: number;
+    code: number;
+    precipitation: number;
+    isDay: boolean;
+  }[];
+  daily: {
+    date: string;
+    high: number;
+    low: number;
+    code: number;
+    precipitation: number;
+  }[];
 };
 
 export type CityResult = Place & { id: number };
@@ -93,7 +105,7 @@ export async function searchCities(query: string): Promise<CityResult[]> {
     results?: {
       id: number;
       name: string;
-      country: string;
+      country?: string;
       latitude: number;
       longitude: number;
       admin1?: string;
@@ -102,7 +114,7 @@ export async function searchCities(query: string): Promise<CityResult[]> {
   return (payload.results ?? []).map((result) => ({
     id: result.id,
     name: result.admin1 && result.admin1 !== result.name ? `${result.name}, ${result.admin1}` : result.name,
-    country: result.country,
+    ...(result.country ? { country: result.country } : {}),
     latitude: result.latitude,
     longitude: result.longitude,
   }));
@@ -114,7 +126,7 @@ export async function fetchWeather(place: Place, unit: WeatherUnit): Promise<Wea
     latitude: String(place.latitude),
     longitude: String(place.longitude),
     current: "temperature_2m,apparent_temperature,weather_code,relative_humidity_2m,wind_speed_10m,is_day",
-    hourly: "temperature_2m,weather_code,precipitation_probability",
+    hourly: "temperature_2m,weather_code,precipitation_probability,is_day",
     daily: "weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max",
     temperature_unit: unit === "imperial" ? "fahrenheit" : "celsius",
     wind_speed_unit: unit === "imperial" ? "mph" : "kmh",
@@ -141,6 +153,7 @@ export async function fetchWeather(place: Place, unit: WeatherUnit): Promise<Wea
       temperature_2m: number[];
       weather_code: number[];
       precipitation_probability: number[];
+      is_day?: number[];
     };
     daily: {
       time: string[];
@@ -151,11 +164,7 @@ export async function fetchWeather(place: Place, unit: WeatherUnit): Promise<Wea
     };
   };
 
-  const hourIndex = Math.max(
-    0,
-    data.hourly.time.findIndex((time) => time >= data.current.time.slice(0, 13)),
-  );
-
+  const hourIndex = Math.max(0, data.hourly.time.findIndex((time) => time >= data.current.time.slice(0, 13)));
   const weather: Weather = {
     place,
     unit,
@@ -171,15 +180,20 @@ export async function fetchWeather(place: Place, unit: WeatherUnit): Promise<Wea
     },
     hourly: data.hourly.time.slice(hourIndex, hourIndex + 24).map((time, index) => ({
       time,
-      temperature: index === 0 ? data.current.temperature_2m : (data.hourly.temperature_2m[hourIndex + index] ?? 0),
-      code: index === 0 ? data.current.weather_code : (data.hourly.weather_code[hourIndex + index] ?? 0),
+      temperature:
+        (index === 0 ? data.current.temperature_2m : data.hourly.temperature_2m[hourIndex + index]) ??
+        data.current.temperature_2m,
+      code:
+        (index === 0 ? data.current.weather_code : data.hourly.weather_code[hourIndex + index]) ??
+        data.current.weather_code,
       precipitation: data.hourly.precipitation_probability[hourIndex + index] ?? 0,
+      isDay: (data.hourly.is_day?.[hourIndex + index] ?? data.current.is_day) === 1,
     })),
     daily: data.daily.time.map((date, index) => ({
       date,
-      high: data.daily.temperature_2m_max[index] ?? 0,
-      low: data.daily.temperature_2m_min[index] ?? 0,
-      code: data.daily.weather_code[index] ?? 0,
+      high: data.daily.temperature_2m_max[index] ?? data.current.temperature_2m,
+      low: data.daily.temperature_2m_min[index] ?? data.current.temperature_2m,
+      code: data.daily.weather_code[index] ?? data.current.weather_code,
       precipitation: data.daily.precipitation_probability_max[index] ?? 0,
     })),
   };
