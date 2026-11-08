@@ -22,10 +22,13 @@ import {
 } from "@/lib/weather";
 
 const LOCAL_ART: Record<string, string> = {
-  Bangkok: "/backgrounds/vibrant/ratchaburi_haze.jpg",
+  Bangkok: "/backgrounds/vibrant/bangkok_sunny.jpg",
+  Kyoto: "/backgrounds/vibrant/kyoto_sunny.jpg",
+  Skopje: "/backgrounds/vibrant/rain_skopje.jpg",
   Ratchaburi: "/backgrounds/vibrant/ratchaburi_haze.jpg",
   Zurich: "/backgrounds/vibrant/snow_swiss.jpg",
-  Default: "/backgrounds/vibrant/ratchaburi_haze.jpg",
+  "Swiss Alps": "/backgrounds/vibrant/snow_swiss.jpg",
+  Default: "/backgrounds/vibrant/bangkok_sunny.jpg",
   Rain: "/backgrounds/vibrant/storm.jpg",
 };
 
@@ -145,7 +148,11 @@ export function WeatherDashboard() {
           .then((payload: { results?: { name: string; country?: string }[] }) => {
             const result = payload.results?.[0];
             if (result) {
-              choosePlace({ ...nearby, name: result.name, country: result.country });
+              choosePlace({
+                ...nearby,
+                name: result.name,
+                ...(result.country ? { country: result.country } : {}),
+              });
             }
           })
           .catch(() => undefined);
@@ -324,15 +331,11 @@ export function WeatherDashboard() {
               Feels like {weather ? Math.round(weather.current.feelsLike) : "—"}°
             </p>
           </div>
-          {weather && (
-            <div className="mb-2 mr-2">
-              <WeatherIcon
-                wmoCode={weather.current.code}
-                isDay={weather.current.isDay}
-                className="size-20 drop-shadow-md"
-              />
-            </div>
-          )}
+          <WeatherIcon
+            wmoCode={weather?.current.code ?? 1}
+            isDay={weather?.current.isDay ?? true}
+            className="mb-2 mr-2 size-24 drop-shadow-md"
+          />
         </div>
       </section>
 
@@ -382,7 +385,7 @@ export function WeatherDashboard() {
               <span className="text-xs text-muted-foreground">
                 {index === 0 ? "Now" : formatForecastTime(hour.time, weather.timezone)}
               </span>
-              <WeatherIcon wmoCode={hour.code} className="size-8" />
+              <WeatherIcon wmoCode={hour.code} isDay={hour.isDay} className="size-8" />
               <strong className="text-sm">{Math.round(hour.temperature)}°</strong>
               <span className="text-xs text-muted-foreground">{Math.round(hour.precipitation)}%</span>
             </div>
